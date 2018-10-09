@@ -49,7 +49,7 @@ Dans le dossier [scripts](scripts/) sont présents l'ensemble des fichiers pytho
 
 #### tests.py : fichier de test sur des données bidons
 
-Le fichier [tests.py](scripts/test.py) permet de tester que tout est installé et que les différents sripts utilisés lors de la reconstruction fonctionnent.
+Le fichier [tests.py](scripts/tests.py) permet de tester que tout est installé et que les différents sripts utilisés lors de la reconstruction fonctionnent.
 
 Il se lance ainsi:
 ```
