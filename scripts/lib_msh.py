@@ -111,7 +111,7 @@ class Mesh:
             print("No .sol file associated with the .mesh file")
 
     # Constructor
-    def __init__(self, path=None, cube=None):
+    def __init__(self, path=None, cube=None, ico=None):
         if cube:
             self.path = None
             self.verts = np.array([
@@ -143,6 +143,43 @@ class Mesh:
             self.quads=np.array([])
             self.tets=np.array([])
             self.computeBBox()
+        elif ico:
+            self.verts = np.array([[ 0.        ,  0.        , -1.        ,  0.        ],
+                [ 0.72359997, -0.52572   , -0.44721499,  0.        ],
+                [-0.27638501, -0.85064   , -0.44721499,  0.        ],
+                [-0.89442497,  0.        , -0.44721499,  0.        ],
+                [-0.27638501,  0.85064   , -0.44721499,  0.        ],
+                [ 0.72359997,  0.52572   , -0.44721499,  0.        ],
+                [ 0.27638501, -0.85064   ,  0.44721499,  0.        ],
+                [-0.72359997, -0.52572   ,  0.44721499,  0.        ],
+                [-0.72359997,  0.52572   ,  0.44721499,  0.        ],
+                [ 0.27638501,  0.85064   ,  0.44721499,  0.        ],
+                [ 0.89442497,  0.        ,  0.44721499,  0.        ],
+                [ 0.        ,  0.        ,  1.        ,  0.        ]])
+            self.tris = np.array([[ 0,  1,  2,  0],
+                [ 1,  0,  5,  0],
+                [ 0,  2,  3,  0],
+                [ 0,  3,  4,  0],
+                [ 0,  4,  5,  0],
+                [ 1,  5, 10,  0],
+                [ 2,  1,  6,  0],
+                [ 3,  2,  7,  0],
+                [ 4,  3,  8,  0],
+                [ 5,  4,  9,  0],
+                [ 1, 10,  6,  0],
+                [ 2,  6,  7,  0],
+                [ 3,  7,  8,  0],
+                [ 4,  8,  9,  0],
+                [ 5,  9, 10,  0],
+                [ 6, 10, 11,  0],
+                [ 7,  6, 11,  0],
+                [ 8,  7, 11,  0],
+                [ 9,  8, 11,  0],
+                [10,  9, 11,  0]])
+            self.quads=np.array([])
+            self.tets=np.array([])
+            self.verts[:,:3]*=0.5*ico[1]
+            self.verts[:,:3]+=ico[0]
         elif path:
             self.done     = []
             self.found    = [False for k in self.keywords]
@@ -381,7 +418,11 @@ class Mesh:
         with open(path,"a") as f:
             f.write("\nEnd")
     def writeSol(self,path):
-        self.writeArray(path,"MeshVersionFormatted 2\nDimension 3\n\nSolAtVertices\n"+str(len(self.scalars))+"\n1 1", self.scalars, '%.8f', firstOpening=True)
+        first = True
+        if len(self.scalars)>0 and len(self.vectors) == 0:
+            self.writeArray(path,"MeshVersionFormatted 2\nDimension 3\n\nSolAtVertices\n"+str(len(self.scalars))+"\n1 1", self.scalars, '%.8f', firstOpening=first)
+        if len(self.vectors)>0 and len(self.scalars) == 0:
+            self.writeArray(path,"MeshVersionFormatted 2\nDimension 3\n\nSolAtVertices\n"+str(len(self.vectors))+"\n1 2", self.vectors, '%.8f %.8f %.8f', firstOpening=first)
 
     # other export functions
     def writeOBJ(self, path):

@@ -4,6 +4,28 @@ import subprocess as sp
 import multiprocessing as mp
 import time
 import tempfile
+import sys
+
+#Chemins vers les executables
+medit         = "medit "
+mmgs          = "mmgs_O3 "
+mmg3d         = "mmg3d_O3 "
+tetgen        = "tetgen "
+mshdist       = "mshdist "
+warping       = "warping "
+morphing      = "morphing "
+python        = "python3.5 "
+blender       = "blender "
+meshlabserver = "LC_ALL=C meshlabserver "
+
+"""
+for exe in [medit, mmgs, mmg3d, tetgen, mshdist, warping, morphing, python, blender, meshlabserver]:
+    try:
+        execute(exe + "--help")
+    except:
+        print("Error: " + exe + "is either:\n\tnot accessible from the command line as specified in lib_exe.py\n\tnot installed\n\tcan't run with the flag --help\nYou'll have to fix this!")
+        sys.exit(1)
+"""
 
 class FacileError(Exception):
     pass
@@ -53,3 +75,9 @@ def execute(cmd, msg="erreur"):
     if code:
         print("Error running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
         raise Exception(msg)
+
+# Functions to create commands
+def python_cmd(f):
+    return python + os.path.abspath(os.path.join(os.path.dirname(__file__),f)) + " "
+def blender_cmd(f):
+    return blender + "--background --python " + os.path.abspath(os.path.join(os.path.dirname(__file__),f)) + " -- "

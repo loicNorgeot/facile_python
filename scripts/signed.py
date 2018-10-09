@@ -25,7 +25,7 @@ def adapt_box_to(f, box, maxNb=20000):
     cube.scalars = mini + (maxi-mini) * (ABS - np.min(ABS)) / (np.max(ABS) - np.min(ABS))
     cube.write("box.1.mesh")
     cube.writeSol("box.1.sol")
-    lib_exe.execute("mmg3d_O3 box.1.mesh -hgrad 1.5  > /dev/null 2>&1")
+    lib_exe.execute(lib_exe.mmg3d + "box.1.mesh -hgrad 1.5  > /dev/null 2>&1")
 
 def create_box(f):
     mesh = lib_msh.Mesh(f)
@@ -34,16 +34,16 @@ def create_box(f):
     cube.verts[:,:3] *= 1.25
     cube.verts[:,:3] += mesh.center
     cube.write("box.mesh")
-    lib_exe.execute( "tetgen -pgANEF box.mesh > /dev/null 2>&1" )
+    lib_exe.execute( lib_exe.tetgen + "-pgANEF box.mesh > /dev/null 2>&1" )
     hausd = 0.04 * np.max(mesh.dims)
-    lib_exe.execute( "mmg3d_O3 box.1.mesh -hausd %f -hmax %f > /dev/null 2>&1" % (hausd, hausd) )
+    lib_exe.execute( lib_exe.mmg3d + "box.1.mesh -hausd %f -hmax %f > /dev/null 2>&1" % (hausd, hausd) )
 
 def signedDistance(f, box=None):
     if box is not None:
         adapt_box_to(f, box)
     else:
         create_box(f)
-    lib_exe.execute( "mshdist -ncpu 16 -noscale box.1.o.mesh " + f + " > /dev/null 2>&1")
+    lib_exe.execute( lib_exe.mshdist + "-ncpu 16 -noscale box.1.o.mesh " + f + " > /dev/null 2>&1")
     if os.path.exists("box.mesh"): os.remove("box.mesh")
     if os.path.exists("box.1.mesh"): os.remove("box.1.mesh")
 

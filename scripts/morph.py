@@ -1,11 +1,3 @@
-"""
-Convert a .obj or a .stl to .mesh file, or all files inside a directory
-
-python convert_stl_to_mesh.py -i /path/to/
-or
-python convert_stl_to_mesh.py -i /path/to/myModel.obj
-"""
-
 import os
 import argparse
 import lib_exe
@@ -16,7 +8,7 @@ import shutil
 if __name__ == "__main__":
 
     #arguments
-    parser = argparse.ArgumentParser(description="Aligns .mesh files together")
+    parser = argparse.ArgumentParser(description="Morphs a mesh to a signed distance volume")
     parser.add_argument("-t", "--template",   type=str, help="Template to morph", required=True)
     parser.add_argument("-o", "--output",     type=str, help="Output mesh", required=True)
     parser.add_argument("-s", "--signed",     type=str, help="Signed distance to morph to", required=True)
@@ -30,7 +22,7 @@ if __name__ == "__main__":
 
     #dref: Fixed surface inside the template (number + ref) elref: Elements inside the fixed surface bref: Follower elements
     shutil.copyfile(args.template, "template.mesh")
-    cmd = "morphing -dref 1 2 -elref 1 2 -nit %d %s %s > /dev/null 2>&1" % (args.iterations, args.signed, "template.mesh")
+    cmd = lib_exe.morphing + "-dref 1 2 -elref 1 2 -nit %d %s %s > /dev/null 2>&1" % (args.iterations, args.signed, "template.mesh")
     lib_exe.execute(cmd)
 
     #Clean the mesh

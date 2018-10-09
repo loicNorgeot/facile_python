@@ -23,10 +23,11 @@ if __name__ == "__main__":
         print("No input file")
         sys.exit(1)
     if args.matrix:
-        args.matrix = os.path.abspath(args.matrix)
-        if not os.path.exists(args.matrix):
-            print("No matrix file")
-            sys.exit(1)
+        for i,m in enumerate(args.matrix):
+            args.matrix[i] = os.path.abspath(m)
+            if not os.path.exists(m):
+                print("No matrix file", m)
+                sys.exit(1)
 
     #apply
     mesh = lib_msh.Mesh(args.input)

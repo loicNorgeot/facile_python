@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     #Remove the inside of the mask
     mesh = lib_msh.Mesh("mask.1.o.mesh")
-    ext_point_ind = np.argmin(mesh.verts[:,:3], axis=0)[0]
+    ext_point_ind = np.argmin(final.verts[:,:3], axis=0)[0]
     ext_ref=None
     for t in mesh.tets:
         if ext_point_ind in t[:4]:
@@ -90,7 +90,6 @@ if __name__ == "__main__":
                 mesh.verts[i,-1]=1
     #Write the mask
     mesh.write(args.output)
-    os.remove("mask.1.o.mesh")
 
     #Volume remesh
     lib_exe.execute("mmg3d_O3 %s -o %s -hausd 0.0005 -nosurf -hgrad 1.15 > /dev/null 2>&1" % (args.output, args.output))

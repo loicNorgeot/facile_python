@@ -5,12 +5,16 @@ import sys
 import argparse
 
 def intersects(f):
-    lib_exe.execute("tetgen -d %s > log.txt" % (f))
-    f = open("log.txt","r")
-    lines = f.readlines()
-    f.close()
+    lib_exe.execute(lib_exe.tetgen + "-d %s > log.txt" % (f))
+    res = True
+    with open("log.txt","r") as f:
+        lines = f.readlines()
+        if "No faces are intersecting" in "".join(lines):
+            res = False
+        else:
+            res = True
     os.remove("log.txt")
-    return "No faces are intersecting" not in "".join(f.readlines())
+    return res
 
 if __name__=="__main__":
 
@@ -23,16 +27,16 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     if not os.path.isfile(args.input):
-        print args.input + " is not a valid file"
+        print(args.input + " is not a valid file")
         sys.exit()
     if not os.path.splitext(args.input)[1] == ".mesh":
-        print args.input + " is not a .mesh file"
+        print(args.input + " is not a .mesh file")
         sys.exit()
     if not os.path.splitext(args.output)[1] == ".mesh":
-        print "Output file must be in the .mesh format"
+        print("Output file must be in the .mesh format")
         sys.exit()
     if intersects(args.input):
-        print args.input + " has intersecting facets"
+        print(args.input + " has intersecting facets")
         sys.exit()
 
     mesh = lib_msh.Mesh(args.input)
@@ -40,8 +44,8 @@ if __name__=="__main__":
     ico.tris[:,-1]=10
     mesh.fondre(ico)
     mesh.write("out.mesh")
-    lib_exe.execute("tetgen -pgANEF out.mesh")
-    lib_exe.execute("mmg3d_O3 out.1.mesh -nosurf -o " + args.output)
+    lib_exe.execute(lib_exe.tetgen + "-pgANEF out.mesh")
+    lib_exe.execute(lib_exe.mmg3d + "out.1.mesh -nosurf -o " + args.output)
     os.remove("out.mesh")
     os.remove("out.1.mesh")
     os.remove(args.output.replace(".mesh", ".sol"))

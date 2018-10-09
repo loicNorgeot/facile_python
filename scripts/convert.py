@@ -5,15 +5,12 @@ import lib_exe
 import lib_msh
 import numpy as np
 
-@lib_exe.debug()
 def to_mesh(f, output):
 
     #Convert a stl to mesh with meshlabserver
     meshlabScript = os.path.join( os.path.dirname(os.path.abspath(__file__)), "meshlab_scripts", "cleanSTL.mlx")
     tmp = f.replace(".stl", ".obj")
-    cmd = "LC_ALL=C meshlabserver -i " + f + " -o " + tmp + " -s " + meshlabScript + " > /dev/null 2>&1"
-    print(cmd)
-    err = os.system(cmd)
+    lib_exe.execute(lib_exe.meshlabserver + "-i %s -o %s -s %s > /dev/null 2>&1" % (f, tmp, meshlabScript))
     f = tmp
 
     #Convert a .obj to .mesh
