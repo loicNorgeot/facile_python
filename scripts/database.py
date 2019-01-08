@@ -97,14 +97,13 @@ if __name__ == "__main__":
     cases = set([f.split("-")[0] for f in os.listdir(EVERYTHING)])
     GROUPS = [[f for f in os.listdir(EVERYTHING) if f.startswith(case) and f.endswith(".mesh") and ("Skin" in f or "Skull" in f)] for case in cases]
     lib_exe.parallel(check, GROUPS)
-    sys.exit(0)
 
     # 4 - Merge the bones (skull, mandibles and teeth) together
     """
     def merge(group):
         OUT   = os.path.join(directories["merged"], group[0][:6] + "Skull.mesh")
         lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
-    cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"])])
+    cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if ".mesh" in f and f[0]!="."])
     GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass" not in f and "Skin" not in f] for case in cases]
     lib_exe.parallel(merge, GROUPS)
     """
