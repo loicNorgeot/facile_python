@@ -7,6 +7,10 @@ import lib_msh
 import os
 import argparse
 from shutil import copyfile
+import sys
+import numpy as np
+
+from lib_paths import *
 
 MERGEMASSETERSTOO = False
 
@@ -82,7 +86,20 @@ if __name__ == "__main__":
     lib_exe.parallel(convert, FILES)
     """
 
-    # 5 - Merge the bones (skull, mandibles and teeth) together
+    # 3 - Check maurice which objects are misaligned
+    def check(group):
+        centerskull = lib_msh.Mesh(os.path.join(EVERYTHING, group[0])).center
+        centerskin  = lib_msh.Mesh(os.path.join(EVERYTHING, group[1])).center
+        def distance(a,b):
+            return ( (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2 ) **0.5
+        if distance(centerskin, centerskull)>50:
+            print(group)
+    cases = set([f.split("-")[0] for f in os.listdir(EVERYTHING)])
+    GROUPS = [[f for f in os.listdir(EVERYTHING) if f.startswith(case) and f.endswith(".mesh") and ("Skin" in f or "Skull" in f)] for case in cases]
+    lib_exe.parallel(check, GROUPS)
+    sys.exit(0)
+
+    # 4 - Merge the bones (skull, mandibles and teeth) together
     """
     def merge(group):
         OUT   = os.path.join(directories["merged"], group[0][:6] + "Skull.mesh")
@@ -92,26 +109,29 @@ if __name__ == "__main__":
     lib_exe.parallel(merge, GROUPS)
     """
 
-    # 3 - Scale everything
+    # 5 - Scale everything
+    """
     def scale(group):
+
+        #Start here
         skull = [g for g in group if "Skull" in g][0]
-        center = lib_msh.Mesh(os.path.join(directories["merged"], skull)).center
-        #MAT = skull.split("-")[0] + "_matrix.txt"
-        S = 0.0035
-        T = -center + 0.5
-        """
-        matrix = [[S,0,0,0],[0,S,0,0],[0,0,S,0],[T[0], T[1], T[2], 1]]
-        with open(MAT, "w") as f:
-            for m in matrix:
-                f.write(" ".join([str(x) for x in m]) + "\n")
-        """
+        # 1 - Translate everything so that the center of the skull is on 0,0,0
+        centerskull = lib_msh.Mesh(os.path.join(directories["merged"], skull)).center
         for g in group:
             IN    = os.path.join(directories["merged"], g)
-            OUT   = os.path.join(directories["scaled"], g)
-            TMP   = os.path.join(directories["scaled"], "tmp_%s.mesh" % skull.split("-")[0] )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f --center %f %f %f" % (IN, TMP, S, S, S, center[0], center[1], center[2]))
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP, OUT, T[0], T[1], T[2]))
-            os.remove(TMP)
+            TMP1  = os.path.join(directories["scaled"], "tmp1_%s" % g )
+            # Translate everything so that the center of the skull is on 0,0,0
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -centerskull[0], -centerskull[1], -centerskull[2]) )
+            # Scale by 0.0035
+            S = 0.0035
+            TMP2  = os.path.join(directories["scaled"], "tmp2_%s" % g )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, S, S, S) )
+            # Translate to 0.5 0.5 0.5
+            OUT  = os.path.join(directories["scaled"], g )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
+            os.remove(TMP1)
+            os.remove(TMP2)
+
     #Copy the masseters and skins from mesh to merged.
     for f in os.listdir(directories["mesh"]):
         if "Mass" in f or "Skin" in f:
@@ -125,8 +145,9 @@ if __name__ == "__main__":
     FILES.sort(key = lambda x:x[0])
     #Execute
     lib_exe.parallel(scale, FILES)
+    """
 
-    # 4 - Remesh all the files
+    # 6 - Remesh all the files
     """
     def remesh(f):
         IN    = os.path.join(directories["scaled"], f)
@@ -139,33 +160,38 @@ if __name__ == "__main__":
     """
 
 
+    # 7 - Align the models
     """
-
-    # 6 - Align the models
     def align(group):
-        SOURCE = os.path.join(directories["merged"], [g for g in group if "bone" in g][0])
-        TARGET = templates["bone"]
-        FILE   = os.path.join(directories["merged"], group[0][:4] + "icp_matrix.txt")
+        SOURCE = os.path.join(directories["remeshed"], [g for g in group if "Skull" in g][0])
+        TARGET = os.path.join(directories["remeshed"], "PREVI-Skull.mesh")#templates["bone"]
+        FILE   = os.path.join(directories["aligned"], group[0].split("-")[0] + "_icp_matrix.txt")
         lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (SOURCE, TARGET, FILE))
         for g in group:
-            IN  = os.path.join(directories["merged"], g)
+            IN  = os.path.join(directories["remeshed"], g)
             OUT = os.path.join(directories["aligned"], g)
             lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (IN, OUT, FILE))
             #S'assurer qu'on n'overwrite pas le fichier de la matrice
             #python3 transform.py -i merged/mandibule.mesh -o aligned/mandibule.mesh -m merged/icp_matrix.txt
-    cases = set([f.split("-")[0] for f in os.listdir(directories["merged"])])
-    GROUPS = [[f for f in os.listdir(directories["merged"]) if f.startswith(case) and f.endswith(".mesh")] for case in cases]
+    cases = set([f.split("-")[0] for f in os.listdir(directories["remeshed"])])
+    GROUPS = [[f for f in os.listdir(directories["remeshed"]) if f.startswith(case) and f.endswith(".mesh")] for case in cases]
     lib_exe.parallel(align, GROUPS)
+    """
 
-    #OPTIONAL: generate a shell for warping from all the skulls we have
+    # 8 - OPTIONAL: generate a shell for warping from all the skulls we have
+    # TOTALLY OPTIONNAL FOR NOW
+    """
     mesh = lib_msh.Mesh()
     for f in os.listdir(directories["merged"]):
         mesh.fondre(lib_msh.Mesh(os.path.join(directories["merged"], f)))
     mesh.write("merged.mesh")
     lib_exe.execute( lib_exe.python_cmd("shell.py") + "-i %s -o %s" % ("merged.mesh", "shell.mesh"))
     os.remove("merged.mesh")
+    """
 
-    # 7 - Warp the bones
+
+    """
+    # 9 - Warp the bones
     def warp(f):
         IN  = os.path.join(directories["aligned"], f)
         OUT = os.path.join(directories["warped"], f)

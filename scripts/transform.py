@@ -51,9 +51,9 @@ if __name__ == "__main__":
         #else:
         #Scale relative to the appropriate center
         if args.scale:
-            mesh.verts[:,:3] -= (mesh.center - args.center) if args.center is not None else mesh.center
+            #mesh.verts[:,:3] -= (mesh.center - args.center) if args.center is not None else mesh.center
             mesh.verts[:,:3] *= args.scale
-            mesh.verts[:,:3] += (mesh.center - args.center) if args.center is not None else mesh.center
+            #mesh.verts[:,:3] += (mesh.center - args.center) if args.center is not None else mesh.center
             mesh.computeBBox()
         if args.translate:
             mesh.verts[:,:3] += args.translate
