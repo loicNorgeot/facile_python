@@ -1,0 +1,11 @@
+#Chemins vers les executables
+medit         = "medit "
+mmgs          = "mmgs_O3 "
+mmg3d         = "mmg3d_O3 "
+tetgen        = "tetgen "
+mshdist       = "/home/loic/bin/mshdist "
+warping       = "warping "
+morphing      = "morphing "
+python        = "python3 "
+blender       = "blender "
+meshlabserver = "LC_ALL=C meshlabserver "

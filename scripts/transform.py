@@ -1,3 +1,7 @@
+"""
+python3 transform.py -i totrans.mesh -o transformed.mesh --scale 1.2 1 8
+"""
+
 import os
 import argparse
 import sys
@@ -13,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output",    type=str, help="Output .mesh file", required=True)
     parser.add_argument("-s", "--scale",     type=float, nargs=3, help="Scale ( x y z )")
     parser.add_argument("-t", "--translate", type=float, nargs=3, help="Translation ( x y z )")
-    parser.add_argument("-c", "--center",    action="store_true", help="Center and scale to [.5, .5, .5]")
+    parser.add_argument("-c", "--center",    type=float, nargs=3, help="Origin ( x y z )")
     parser.add_argument("-m", "--matrix",    type=str, nargs="+", help="Matrix file(s)")
     args = parser.parse_args()
 
@@ -35,6 +39,7 @@ if __name__ == "__main__":
         for matrix in args.matrix:
             mesh.applyMatrix(matFile = matrix)
     else:
+        """
         if args.center:
             mesh.verts[:,:3] -= mesh.center
             if args.scale:
@@ -42,11 +47,14 @@ if __name__ == "__main__":
             else:
                 mesh.verts[:,:3] *= 1. / np.max(mesh.dims)
             mesh.verts[:,:3] += [0.5,0.5,0.5]
-        else:
-            if args.scale:
-                mesh.verts[:,:3] -= mesh.center
-                mesh.verts[:,:3] *= args.scale
-                mesh.verts[:,:3] += mesh.center
+        """
+        #else:
+        #Scale relative to the appropriate center
+        if args.scale:
+            mesh.verts[:,:3] -= (mesh.center - args.center) if args.center is not None else mesh.center
+            mesh.verts[:,:3] *= args.scale
+            mesh.verts[:,:3] += (mesh.center - args.center) if args.center is not None else mesh.center
+            mesh.computeBBox()
         if args.translate:
             mesh.verts[:,:3] += args.translate
     mesh.write(args.output)

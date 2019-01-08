@@ -6,17 +6,8 @@ import time
 import tempfile
 import sys
 
-#Chemins vers les executables
-medit         = "medit "
-mmgs          = "mmgs_O3 "
-mmg3d         = "mmg3d_O3 "
-tetgen        = "tetgen "
-mshdist       = "mshdist "
-warping       = "warping "
-morphing      = "morphing "
-python        = "python3.5 "
-blender       = "blender "
-meshlabserver = "LC_ALL=C meshlabserver "
+#Import des executables
+from lib_paths import *
 
 """
 for exe in [medit, mmgs, mmg3d, tetgen, mshdist, warping, morphing, python, blender, meshlabserver]:
@@ -70,7 +61,7 @@ def parallel(func, items, ncpus=128):
 def execute(cmd, msg="erreur"):
     print("Running '" + cmd + "'")
     process  = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
-    out, err = process.communicate()
+    out, err = [x.strip() for x in process.communicate()]
     code     = process.returncode
     if code:
         print("Error running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))

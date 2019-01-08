@@ -1,9 +1,14 @@
+"""
+python3 database.py -d FILES/ -t TEMPLATES/
+"""
+
 import lib_exe
 import lib_msh
 import os
 import argparse
+from shutil import copyfile
 
-
+MERGEMASSETERSTOO = False
 
 #arguments
 def get_arguments():
@@ -25,7 +30,7 @@ def create_templates_and_directories(args):
 
     #Create the directories to process files into
     dirNames = [
-        "raw",
+        #"raw",
         "mesh",
         "scaled",
         "remeshed",
@@ -48,12 +53,9 @@ def create_templates_and_directories(args):
 
     return templates, directories
 
-#Fonction pour lancer l'ensemble du process
-def run():
+if __name__ == "__main__":
     args = get_arguments()
     templates, directories = create_templates_and_directories(args)
-
-
 
     ################################################################################
     # 1 - Create the database
@@ -70,6 +72,7 @@ def run():
     """
 
     # 2 - Convert all the downloaded files to .mesh
+    """
     def convert(f):
         IN  = os.path.join(directories["raw"], f)
         OUT = os.path.join(directories["mesh"], f.replace("obj","mesh").replace("stl","mesh"))
@@ -77,38 +80,66 @@ def run():
     FILES = [f for f in os.listdir(directories["raw"]) if os.path.splitext(f)[1] in [".obj", ".stl"]]
     FILES = [f for f in FILES if f.replace(".obj", ".mesh").replace(".stl",".mesh") not in os.listdir(directories["mesh"])]
     lib_exe.parallel(convert, FILES)
+    """
+
+    # 5 - Merge the bones (skull, mandibles and teeth) together
+    """
+    def merge(group):
+        OUT   = os.path.join(directories["merged"], group[0][:6] + "Skull.mesh")
+        lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
+    cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"])])
+    GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass" not in f and "Skin" not in f] for case in cases]
+    lib_exe.parallel(merge, GROUPS)
+    """
 
     # 3 - Scale everything
     def scale(group):
-        center = lib_msh.Mesh([os.path.join(directories["mesh"], g) for g in group if "bone" in g][0]).center
+        skull = [g for g in group if "Skull" in g][0]
+        center = lib_msh.Mesh(os.path.join(directories["merged"], skull)).center
+        #MAT = skull.split("-")[0] + "_matrix.txt"
+        S = 0.0035
+        T = -center + 0.5
+        """
+        matrix = [[S,0,0,0],[0,S,0,0],[0,0,S,0],[T[0], T[1], T[2], 1]]
+        with open(MAT, "w") as f:
+            for m in matrix:
+                f.write(" ".join([str(x) for x in m]) + "\n")
+        """
         for g in group:
-            IN    = os.path.join(directories["mesh"], g)
+            IN    = os.path.join(directories["merged"], g)
             OUT   = os.path.join(directories["scaled"], g)
-            SCALE = 0.0035
-            TRANS = -center + 0.5
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f -t %f %f %f" % (IN, OUT, SCALE, SCALE, SCALE, TRANS[0], TRANS[1], TRANS[2]))
-    cases = set([f[:3] for f in os.listdir(directories["mesh"])])
-    FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case)] for case in cases]
-    FILES = [f for f in FILES if f not in os.listdir(directories["scaled"])]
+            TMP   = os.path.join(directories["scaled"], "tmp_%s.mesh" % skull.split("-")[0] )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f --center %f %f %f" % (IN, TMP, S, S, S, center[0], center[1], center[2]))
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP, OUT, T[0], T[1], T[2]))
+            os.remove(TMP)
+    #Copy the masseters and skins from mesh to merged.
+    for f in os.listdir(directories["mesh"]):
+        if "Mass" in f or "Skin" in f:
+            copyfile(
+                os.path.join(directories["mesh"], f),
+                os.path.join(directories["merged"], f)
+            )
+    #Get the skull files in "merged"
+    cases = set([f.split("-")[0] for f in os.listdir(directories["merged"])])
+    FILES = [[f for f in os.listdir(directories["merged"]) if f.startswith(case)] for case in cases]
+    FILES.sort(key = lambda x:x[0])
+    #Execute
     lib_exe.parallel(scale, FILES)
 
     # 4 - Remesh all the files
+    """
     def remesh(f):
         IN    = os.path.join(directories["scaled"], f)
         HAUSD = 0.0025
         OUT   = os.path.join(directories["remeshed"], f)
-        lib_exe.execute(lib_exe.mmgs + "%s -nr -nreg -hausd %f -o %s > /dev/null 2>&1" % (IN, HAUSD, OUT))
+        lib_exe.execute(lib_exe.mmgs + "%s -nr -nreg -hausd %f -out %s > /dev/null 2>&1" % (IN, HAUSD, OUT))
     FILES = [f for f in os.listdir(directories["scaled"]) if ".mesh" in f]
     FILES = [f for f in FILES if f not in os.listdir(directories["remeshed"])]
     lib_exe.parallel(remesh, FILES)
+    """
 
-    # 5 - Merge the bones (skull, mandibles and teeth) together
-    def merge(group):
-        OUT   = os.path.join(directories["merged"], group[0][:4] + "bone.mesh")
-        lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["remeshed"], g) for g in group]), OUT))
-    cases = set([f[:3] for f in os.listdir(directories["remeshed"])])
-    GROUPS = [[f for f in os.listdir(directories["remeshed"]) if f.startswith(case) and f.endswith(".mesh") and "mass" not in f and "face" not in f] for case in cases]
-    lib_exe.parallel(merge, GROUPS)
+
+    """
 
     # 6 - Align the models
     def align(group):
@@ -120,7 +151,9 @@ def run():
             IN  = os.path.join(directories["merged"], g)
             OUT = os.path.join(directories["aligned"], g)
             lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (IN, OUT, FILE))
-    cases = set([f[:3] for f in os.listdir(directories["merged"])])
+            #S'assurer qu'on n'overwrite pas le fichier de la matrice
+            #python3 transform.py -i merged/mandibule.mesh -o aligned/mandibule.mesh -m merged/icp_matrix.txt
+    cases = set([f.split("-")[0] for f in os.listdir(directories["merged"])])
     GROUPS = [[f for f in os.listdir(directories["merged"]) if f.startswith(case) and f.endswith(".mesh")] for case in cases]
     lib_exe.parallel(align, GROUPS)
 
@@ -131,7 +164,6 @@ def run():
     mesh.write("merged.mesh")
     lib_exe.execute( lib_exe.python_cmd("shell.py") + "-i %s -o %s" % ("merged.mesh", "shell.mesh"))
     os.remove("merged.mesh")
-
 
     # 7 - Warp the bones
     def warp(f):
@@ -172,7 +204,7 @@ def run():
     FILES = [f for f in os.listdir(directories["warped"]) if f not in os.listdir(directories["filled"])]
     lib_exe.parallel(fill, FILES)
 
-    # 10 - Morph the appropriate templates to the skull and the faces
+    # 11 - Morph the appropriate templates to the skull (and the faces = used for later, to have the same mesh for all faces)
     def morph(f):
         IN  = os.path.join(directories["filled"], f)
         OUT = os.path.join(directories["morphed"], f)
@@ -182,14 +214,13 @@ def run():
     FILES = [f for f in FILES if f not in os.listdir(directories["morphed"])]
     lib_exe.parallel(morph, FILES)
 
-
-    # 12 - Generate the masks
+    # 12 - Generate "La Masqué"
     def mask(num):
         INTERIOR  = os.path.join(directories["morphed"], num + "_bone.mesh")
         EXTERIOR  = os.path.join(directories["morphed"], num + "_face.mesh")
         MASK      = os.path.join(directories["masked"], num + "_mask.mesh")
         lib_exe.parallel(mask, GROUPS)
-    NUMS = set([f[:3] for f in os.listdir(directories["morphed"]) if f.endswith("mesh")])
+    NUMS = set([f.split("-")[0] for f in os.listdir(directories["morphed"]) if f.endswith("mesh")])
     NUMS = [n for n in NUMS if os.path.exists(os.path.join(directories["morphed"], n+"_face.mesh")) and os.path.exists(os.path.join(directories["morphed"], n+"_bone.mesh"))]
     NUMS = [n for n in NUMS if not os.path.exists(os.path.join(directories["masked"], n+"_mask.mesh"))]
     lib_exe.parallel(mask, NUMS)
@@ -260,7 +291,7 @@ def run():
     lib_exe.execute( lib_exe.python_cmd("shell.py") + "-i %s -o %s" % ("merged.mesh", "shell_masseter.mesh"))
     os.remove("merged.mesh")
 
-    # 7 - Warp the masseters and the mandibles
+    # 7 - Warp the mandibles
     def warp(f):
         IN  = os.path.join(directories["splitted"], f)
         OUT = os.path.join(directories["splitted"], f.replace(".aligned.mesh", ".warped.mesh"))
@@ -269,53 +300,4 @@ def run():
     FILES = [f for f in os.listdir(directories["splitted"]) if ".aligned.mesh" in f and f.replace(".aligned.mesh", ".warped.mesh") not in os.listdir(directories["splitted"])]
     lib_exe.parallel(warp, FILES)
 
-
-
-#Fonction pour tester une étape
-def test():
-    args = get_arguments()
-    templates, directories = create_templates_and_directories(args)
-
-    #directories
-    input_dir = "/home/norgeot/test/"
-    output_dir = "/home/norgeot/test_sortie/"
-
-    #Create a function to translate one .mesh file on the Y axis by 2, and remesh with mmgs
-    def move(filepath):
-        #Get the input and output paths
-        IN  = os.path.join(input_dir, f)
-        OUT = os.path.join(output_dir, f)
-
-        #Open the .mesh file
-        mesh = lib_msh.Mesh( IN )
-        #Move the vertices by 2 on the Y axis
-        mesh.verts[:,1] += 2
-        #Change the reference of the tetrahedron to 3
-        mesh.tets[:,-1] = 3
-        #Write the mesh to a temporary file
-        mesh.write("tmp.mesh")
-
-        #Run mmgs
-        lib_exe.execute(lib_exe.mmgs + "%s -o %s -hausd 0.1" % ("tmp.mesh", OUT))
-
-        #Remove the unnecessary files
-        os.remove("tmp.mesh")
-        os.remove(OUT.replace(".mesh", ".sol"))
-
-    #List the files in the input directory, which have "toto" and .mesh in their names
-    FILES = [f for f in os.listdir(input_dir) if "toto" in f and ".mesh" in f]
-
-    #Remove the files from the list which are already in the  output directory
-    FILES = [f for f in FILES if f not in os.listdir(output_dir)]
-
-    #Run the function "move" on all the files in parallel
-    lib_exe.parallel(move, FILES)
-
-    #list the files in the output directory
-    print("Fichiers de sortie:")
-    for f in os.listdir(output_dir):
-        print(f)
-
-if __name__ == "__main__":
-    run()
-    #test()
+    """
