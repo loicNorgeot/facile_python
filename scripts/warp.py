@@ -4,6 +4,8 @@ import lib_exe
 import lib_msh
 import numpy as np
 import shutil
+import sys
+import lib_paths
 
 if __name__ == "__main__":
 
@@ -23,10 +25,16 @@ if __name__ == "__main__":
     shutil.copyfile(args.template, "sphere.mesh")
 
     #Warp
-    lib_exe.execute(lib_exe.warping + "%s -p -nit %f -load %f > /dev/null 2>&1" % (args.input, 150, 40) )
+    lib_exe.execute(lib_paths.wrapping + " %s -p -nit %d -load %f > /dev/null 2>&1" % (args.input, 150, 40) )
 
     #Clean the mesh and extract the surface
-    warped = msh.Mesh("sphere.d.mesh")
+    final = None
+    number_max=-1
+    for f in [x for x in os.listdir(".") if "sphere.d." in x and ".mesh" in x]:
+        number = int(f.split(".")[2])
+        if number>number_max:
+            final = f
+    warped = lib_msh.Mesh(final)
     ext_ref = 2
     warped.tris = warped.tris[warped.tris[:,-1] != ext_ref]
     warped.tets = np.array([])
@@ -34,5 +42,5 @@ if __name__ == "__main__":
     warped.write(args.output)
 
     #Remove the unused files
-    os.remove("sphere.mesh")
-    os.remove("sphere.d.mesh")
+    #os.remove("sphere.mesh")
+    #os.remove("sphere.d.mesh")

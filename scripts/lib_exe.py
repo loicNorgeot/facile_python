@@ -53,10 +53,14 @@ def debug():
     return true_decorator
 
 def parallel(func, items, ncpus=128):
-    num = min( ncpus, min(len(items), mp.cpu_count()-1 ))
-    print('\033[95m' + "## EXECUTING '" + func.__name__ + "' on " + str(len(items)) + " cases and " + str(num) + " process(es)." + '\033[0m')
-    res = mp.Pool(processes=num).map(func, items )
-    return res
+    if len(items)>0:
+        num = min( ncpus, min(len(items), mp.cpu_count()-1 ))
+        print('\033[95m' + "## EXECUTING '" + func.__name__ + "' on " + str(len(items)) + " cases and " + str(num) + " process(es)." + '\033[0m')
+        res = mp.Pool(processes=num).map(func, items )
+        return res
+    else:
+        print('\033[95m' + "## SKIPPING '" + func.__name__ + ", no data found." + '\033[0m')
+        pass
 
 def execute(cmd, msg="erreur"):
     print("Running '" + cmd + "'")
@@ -65,6 +69,7 @@ def execute(cmd, msg="erreur"):
     code     = process.returncode
     if code:
         print("Error running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
+        print()
         raise Exception(msg)
 
 # Functions to create commands

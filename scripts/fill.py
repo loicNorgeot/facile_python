@@ -44,8 +44,19 @@ if __name__=="__main__":
     ico.tris[:,-1]=10
     mesh.fondre(ico)
     mesh.write("out.mesh")
-    lib_exe.execute(lib_exe.tetgen + "-pgANEF out.mesh")
+    lib_exe.execute(lib_exe.tetgen + "-pgANEYF out.mesh")
     lib_exe.execute(lib_exe.mmg3d + "out.1.mesh -nosurf -o " + args.output)
+    os.remove(args.output.replace(".mesh", ".sol"))
+
+    #Make the same references in args.output than in out.mesh
+    def distance(a,b):
+        return ( (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2 ) **0.5
+    final = lib_msh.Mesh(args.output)
+    for i,t in enumerate(final.tris):
+        vert1 = final.verts[t[0]]
+        if distance(vert1, [0.5, 0.5, 0.65]) < 0.12:
+            final.tris[i,-1] = 10
+    final.write(args.output)
+
     os.remove("out.mesh")
     os.remove("out.1.mesh")
-    os.remove(args.output.replace(".mesh", ".sol"))

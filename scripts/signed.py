@@ -35,7 +35,7 @@ def create_box(f):
     cube.verts[:,:3] += mesh.center
     cube.write("box.mesh")
     lib_exe.execute( lib_exe.tetgen + "-pgANEF box.mesh > /dev/null 2>&1" )
-    hausd = 0.04 * np.max(mesh.dims)
+    hausd = 0.02 * np.max(mesh.dims)
     lib_exe.execute( lib_exe.mmg3d + "box.1.mesh -hausd %f -hmax %f > /dev/null 2>&1" % (hausd, hausd) )
 
 def signedDistance(f, box=None):

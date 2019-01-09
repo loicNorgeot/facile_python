@@ -27,7 +27,11 @@ def get_arguments():
 #templates and directories
 def create_templates_and_directories(args):
     #Create the paths for the template files
-    templateNames = ["masseter", "mandible", "bone", "sphere", "morphing", "morphingSkull", "box"]
+    """
+    Looks in the directory associated with the templates, for a skull.mesh file for instance.
+    If skull.mesh is found, then a variable templates["skull"] becomes available.
+    """
+    templateNames = ["masseter", "mandible", "skull", "sphere", "morphing_face", "morphing_skull", "box"]
     templates     = {}
     for d in templateNames:
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
@@ -87,6 +91,7 @@ if __name__ == "__main__":
     """
 
     # 3 - Check maurice which objects are misaligned
+    """
     def check(group):
         centerskull = lib_msh.Mesh(os.path.join(EVERYTHING, group[0])).center
         centerskin  = lib_msh.Mesh(os.path.join(EVERYTHING, group[1])).center
@@ -97,19 +102,20 @@ if __name__ == "__main__":
     cases = set([f.split("-")[0] for f in os.listdir(EVERYTHING)])
     GROUPS = [[f for f in os.listdir(EVERYTHING) if f.startswith(case) and f.endswith(".mesh") and ("Skin" in f or "Skull" in f)] for case in cases]
     lib_exe.parallel(check, GROUPS)
-
-    # 4 - Merge the bones (skull, mandibles and teeth) together
     """
+
+    """
+    # 4 - Merge the bones (skull, mandibles and teeth) together
     def merge(group):
         OUT   = os.path.join(directories["merged"], group[0][:6] + "Skull.mesh")
         lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
     cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if ".mesh" in f and f[0]!="."])
     GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass" not in f and "Skin" not in f] for case in cases]
     lib_exe.parallel(merge, GROUPS)
-    """
+
 
     # 5 - Scale everything
-    """
+
     def scale(group):
 
         #Start here
@@ -144,10 +150,8 @@ if __name__ == "__main__":
     FILES.sort(key = lambda x:x[0])
     #Execute
     lib_exe.parallel(scale, FILES)
-    """
 
     # 6 - Remesh all the files
-    """
     def remesh(f):
         IN    = os.path.join(directories["scaled"], f)
         HAUSD = 0.0025
@@ -160,10 +164,10 @@ if __name__ == "__main__":
 
 
     # 7 - Align the models
-    """
+
     def align(group):
         SOURCE = os.path.join(directories["remeshed"], [g for g in group if "Skull" in g][0])
-        TARGET = os.path.join(directories["remeshed"], "PREVI-Skull.mesh")#templates["bone"]
+        TARGET = templates["skull"]
         FILE   = os.path.join(directories["aligned"], group[0].split("-")[0] + "_icp_matrix.txt")
         lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (SOURCE, TARGET, FILE))
         for g in group:
@@ -173,9 +177,11 @@ if __name__ == "__main__":
             #S'assurer qu'on n'overwrite pas le fichier de la matrice
             #python3 transform.py -i merged/mandibule.mesh -o aligned/mandibule.mesh -m merged/icp_matrix.txt
     cases = set([f.split("-")[0] for f in os.listdir(directories["remeshed"])])
-    GROUPS = [[f for f in os.listdir(directories["remeshed"]) if f.startswith(case) and f.endswith(".mesh")] for case in cases]
+    GROUPS = [[f for f in os.listdir(directories["remeshed"]) if f.startswith(case) and f.endswith(".mesh") and f not in os.listdir(directories["aligned"])] for case in cases]
+    GROUPS = [g for g in GROUPS if len(g)>0]
+    for g in GROUPS:
+        print(g)
     lib_exe.parallel(align, GROUPS)
-    """
 
     # 8 - OPTIONAL: generate a shell for warping from all the skulls we have
     # TOTALLY OPTIONNAL FOR NOW
@@ -189,67 +195,200 @@ if __name__ == "__main__":
     """
 
 
-    """
-    # 9 - Warp the bones
-    def warp(f):
-        IN  = os.path.join(directories["aligned"], f)
-        OUT = os.path.join(directories["warped"], f)
-        TEMPLATE = templates["sphere"]
-        lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
-    FILES = [f for f in os.listdir(directories["aligned"]) if "bone" in f and ".mesh" in f]
-    FILES = [f for f in FILES if f not in os.listdir(directories["warped"])]
-    lib_exe.parallel(warp, FILES)
 
-    # 8 - Compute the signed distances on the warped bones...
+    # 9 - Warp the bones
+    import tempfile
+
+    #9.1 - Scale to allow the warping to not crash
+    """
+    skullstowarp = [f for f in os.listdir(directories["aligned"]) if "Skull.mesh" in f]
+    print("SKULLSTOWAR\n", skullstowarp)
+    for skull in skullstowarp:
+        with tempfile.TemporaryDirectory() as tmp:
+            IN    = os.path.join(directories["aligned"], skull)
+            TMP1  = os.path.join(tmp, "tmp1_%s" % skull )
+            TMP2  = os.path.join(tmp, "tmp2_%s" % skull )
+            OUT  = os.path.join(directories["aligned"], "towarp_" + skull )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -0.5, -0.5, -0.5) )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, 0.2, 0.2, 0.2) )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
+    """
+
+    #9.2 - Do the warping
+    """
+    def warp(f):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.chdir(tmp)
+            IN  = os.path.join(directories["aligned"], f)
+            OUT = os.path.join(directories["warped"], f)
+            TEMPLATE = templates["sphere"]
+            lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
+    FILES = [f for f in os.listdir(directories["aligned"]) if "Skull.mesh" in f]
+    FILES = [f for f in FILES if f not in os.listdir(directories["warped"])]
+    print("FILES\n",FILES)
+    lib_exe.parallel(warp, FILES)
+    """
+
+    #9.3 - Scale the skulls back to the last dimensions before the warping
+    """
+    skullstowarp = [f for f in os.listdir(directories["warped"]) if "Skull.mesh" in f and "to_warp" in f]
+    print("SKULLSTOSCALEBACK\n", skullstowarp)
+    for skull in skullstowarp:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp        = tempfile.TemporaryDirectory()
+            IN    = os.path.join(directories["warped"], skull)
+            TMP1  = os.path.join(tmp, "tmp1_%s" % skull )
+            TMP2  = os.path.join(tmp, "tmp2_%s" % skull )
+            OUT  = os.path.join(directories["warped"], skull.replace("to_warp","") )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -0.5, -0.5, -0.5) )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, 5, 5, 5) )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
+    """
+
+
+
+
+
+
+
+
+    # 10 - Compute the signed distances on the warped bones...
+    """
     def signed(f):
         IN  = os.path.join(directories["warped"], f)
         OUT = os.path.join(directories["signed"], f)
         BOX = templates["box"]
-        lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s" % (IN, OUT, BOX))
-    FILES = [f for f in os.listdir(directories["warped"]) if "bone" in f and f.endswith(".mesh")]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.chdir(tmp)
+            lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s" % (IN, OUT, BOX))
+    FILES = [f for f in os.listdir(directories["warped"]) if "Skull" in f and f.endswith(".mesh")]
     FILES = [f for f in FILES if f not in os.listdir(directories["signed"])]
+    FILES = [f for f in FILES if "BENVA" in f]
     lib_exe.parallel(signed, FILES)
 
-    # 9 - ... and on the faces
+    # 11 - ... and on the faces
     def signed(f):
         IN  = os.path.join(directories["aligned"], f)
         OUT = os.path.join(directories["signed"], f)
         BOX = templates["box"]
-        lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s" % (IN, OUT, BOX))
-    FILES = [f for f in os.listdir(directories["aligned"]) if "face" in f and f.endswith(".mesh")]
-    FILES = [f for f in FILES if f not in os.listdir(directories["signed"])]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.chdir(tmp)
+            lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s" % (IN, OUT, BOX))
+    FILES = [f for f in os.listdir(directories["aligned"]) if "Skin" in f and f.endswith(".mesh")]
+    NEWFILES = []
+    for f1 in FILES:
+        for f2 in os.listdir(directories["signed"]):
+            if "Skull" in f2:
+                if f1.split("-")[0] == f2.split("-")[0]:
+                    NEWFILES.append(f1)
+                    break
+    FILES = [f for f in NEWFILES if f not in os.listdir(directories["signed"])]
     lib_exe.parallel(signed, FILES)
+    """
 
-    #10 - Fill the wrapped surfaces with tetrahedra and an icosphere
+
+    #12 - Fill the wrapped surfaces with tetrahedra and an icosphere
+    """
     def fill(f):
         IN  = os.path.join(directories["warped"], f)
         OUT = os.path.join(directories["filled"], f)
-        BOX = templates["box"]
-        lib_exe.execute( lib_exe.python_cmd("fill.py") + "-i %s -o %s -c 0.5 0.5 0.7 -r 0.05" % (IN, OUT))
-    FILES = [f for f in os.listdir(directories["warped"]) if f not in os.listdir(directories["filled"])]
+        lib_exe.execute( lib_exe.python_cmd("fill.py") + "-i %s -o %s -c 0.5 0.5 0.65 -r 0.1" % (IN, OUT))
+    FILES = [f for f in os.listdir(directories["warped"]) if f not in os.listdir(directories["filled"]) if "GROJU" in f]
     lib_exe.parallel(fill, FILES)
+    """
 
-    # 11 - Morph the appropriate templates to the skull (and the faces = used for later, to have the same mesh for all faces)
+    # 13 - Morph the appropriate templates to the skull (and the faces = used for later, to have the same mesh for all faces)
+    """
     def morph(f):
-        IN  = os.path.join(directories["filled"], f)
-        OUT = os.path.join(directories["morphed"], f)
-        TMP = templates["morphingSkull"] if "bone" in f else templates["morphing"]
-        lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s" % (TMP, IN, OUT))
-    FILES = [f for f in os.listdir(directories["filled"]) if "bone" in f or "face" in f and f.endswith("mesh") ]
+        IN   = os.path.join(directories["signed"], f)
+        OUT  = os.path.join(directories["morphed"], f)
+        TMP  = templates["morphing_skull"] if "Skull" in f else templates["morphing_face"]
+        REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3]
+        lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2]))
+    FILES = [f for f in os.listdir(directories["signed"]) if "Skull" in f and f.endswith("mesh") ]
     FILES = [f for f in FILES if f not in os.listdir(directories["morphed"])]
     lib_exe.parallel(morph, FILES)
+    """
 
-    # 12 - Generate "La Masqué"
-    def mask(num):
-        INTERIOR  = os.path.join(directories["morphed"], num + "_bone.mesh")
-        EXTERIOR  = os.path.join(directories["morphed"], num + "_face.mesh")
-        MASK      = os.path.join(directories["masked"], num + "_mask.mesh")
-        lib_exe.parallel(mask, GROUPS)
-    NUMS = set([f.split("-")[0] for f in os.listdir(directories["morphed"]) if f.endswith("mesh")])
-    NUMS = [n for n in NUMS if os.path.exists(os.path.join(directories["morphed"], n+"_face.mesh")) and os.path.exists(os.path.join(directories["morphed"], n+"_bone.mesh"))]
-    NUMS = [n for n in NUMS if not os.path.exists(os.path.join(directories["masked"], n+"_mask.mesh"))]
-    lib_exe.parallel(mask, NUMS)
+    # 14 - Generate "La Masqué"
+    def mask(group):
+        INTERIOR  = [ os.path.join(directories["morphed"], g) for g in group if "Skull" in g][0]
+        EXTERIOR  = [ os.path.join(directories["morphed"], g) for g in group if "Skin" in g][0]
+        MASK      = os.path.join(directories["masked"], group[0].split("-")[0] + "_la_masque.mesh")
+        TEMPLATE  = templates["morphing_skull"]
+        lib_exe.execute( lib_exe.python_cmd("mask.py") + "-i %s -e %s -o %s -t %s" % (INTERIOR, EXTERIOR, MASK, TEMPLATE))
 
+    cases = set([f.split("-")[0] for f in os.listdir(directories["morphed"]) if ".mesh" in f])
+    GROUPS = [ [f for f in os.listdir(directories["morphed"]) if ("Skull" in f or "Skin" in f) and case in f] for case in cases]
+    GROUPS = [g for g in GROUPS if len(g)==2]
+    lib_exe.parallel(mask, GROUPS)
+
+
+
+    ################################################################################
+    # 2 - Reconstruction d'un nouveau crane sans masseter
+    ################################################################################
+
+    """
+    TODO pour BIBI = Loïc
+    1. Relancer les cas avec une sphere plus légère pour le warping
+    2. S'énerver sur le champ de deplacement dans le crane a l'interieur
+    3. Faire marcher l'elasticité avec le champ de deplacement
+    4. ...
+    """
+
+    """
+    Pour reconstruire un nouveau crane, on lui fait subir des opérations similaires aux crânes de la base de données.
+    Sous-citées:
+    1. Merge les teeth, mands... si nécessaire
+    1. optionnel On merge eventuellement le masseter reconstruit.
+    2. Mise à l'échelle par rapport au template skull
+    3. Remaillage avec la meme distance d'haussdorf que les autres
+    4. Warp sphere.mesh vers le crane
+    5. Calcul de la distance signée de la surface ainsi warpée
+    6. Morphing de morphing_skull.mesh vers la distance signée sus-citée
+    7. Choix d'un masque ou d'une moyenne de masques qui sont les plus proches
+    8. Déplacement des masques vers la surface.
+    9. A vrai dire, c'est plutot à cette étape ci qu'on fait la moyenne
+    """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    """
     ################################################################################
     # 2 - Prepare the mandibles and masseters (cut them in half and position)
     ################################################################################

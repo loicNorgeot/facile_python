@@ -90,7 +90,7 @@ if __name__ == "__main__":
                 mesh.verts[i,-1]=1
     #Write the mask
     mesh.write(args.output)
-    os.remove("mask.1.o.mesh")
+    #os.remove("mask.1.o.mesh")
 
     #Volume remesh
     lib_exe.execute("mmg3d_O3 %s -o %s -hausd 0.0005 -nosurf -hgrad 1.15 > /dev/null 2>&1" % (args.output, args.output))
@@ -98,18 +98,23 @@ if __name__ == "__main__":
 
     #Add a .sol corresponding to the difference between the interior surface and the template
     if args.template:
+        print("We're here")
         template = lib_msh.Mesh(args.template)
         template.tets = np.array([])
         template.tris = template.tris[template.tris[:,-1]==1]
         template.discardUnused()
 
-        mesh = lib_msh.Mesh(args.output.replace(".mesh", ".o.mesh"))
-        n = len(mesh.verts)
-        mesh.tris = mesh.tris[mesh.tris[:,-1]==1]
         mesh.tets = np.array([])
         mesh.discardUnused()
+
+        #mesh = lib_msh.Mesh(args.output.replace(".mesh", ".o.mesh"))
+        print("Wish you were here")
+
+        n = len(mesh.verts)
         mesh.vectors = np.zeros((n,3))
-        mesh.vectors[:len(template.verts)] = mesh.verts[:,:3] - template.verts[:,:3] #THIS SHOULD BE REPLACED BY THE RESULTS OF MORPHING
+
+        print(len(mesh.verts), len(template.verts))
+        mesh.vectors[:len(template.verts)] = mesh.verts[:len(template.verts),:3] - template.verts[:,:3] #THIS SHOULD BE REPLACED BY THE RESULTS OF MORPHING
 
         mesh.writeSol( args.output.replace(".mesh", ".sol") )
 mesh.write( args.output )
