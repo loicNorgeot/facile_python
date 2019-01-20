@@ -277,66 +277,6 @@ if __name__ == "__main__":
     lib_exe.parallel(mask, GROUPS)
     """
 
-    ################################################################################
-    # 2 - Reconstruction d'un nouveau crane sans masseter
-    ################################################################################
-
-    """
-    TODO pour BIBI = Loïc
-    1. Relancer les cas avec une sphere plus légère pour le warping
-    2. S'énerver sur le champ de deplacement dans le crane a l'interieur = CE SOIR GROS FILS DE P**A
-    3. Faire marcher l'elasticité avec le champ de deplacement
-    4. Faire en sorte de pouvoir relancer le script avec de nouvelles données, sans tout refire à chaque fois. "C'est intéressant" - Lydie.
-    5. Egalement faire le morphing des visages
-    """
-
-    """
-    Pour reconstruire un nouveau crane, on lui fait subir des opérations similaires aux crânes de la base de données.
-    Sous-citées:
-    1. Merge les teeth, mands... si nécessaire
-    1. optionnel On merge eventuellement le masseter reconstruit.
-    2. Mise à l'échelle par rapport au template skull
-    3. Remaillage avec la meme distance d'haussdorf que les autres
-    4. Warp sphere.mesh vers le crane
-    5. Calcul de la distance signée de la surface ainsi warpée
-    6. Morphing de morphing_skull.mesh vers la distance signée sus-citée
-    7. Choix d'un masque ou d'une moyenne de masques qui sont les plus proches
-    8. Déplacement des masques vers la surface.
-    9. A vrai dire, c'est plutot à cette étape ci qu'on fait la moyenne
-    """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
