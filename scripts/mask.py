@@ -35,6 +35,7 @@ if __name__ == "__main__":
     if args.template:
         args.template = os.path.abspath(args.template)
 
+
     #check for intersections
     if intersects(args.interior):
         print("interior surface is self-intersecting")
@@ -45,21 +46,24 @@ if __name__ == "__main__":
 
     #Merge the meshes and run tetgen
     exterior, interior = lib_msh.Mesh(args.exterior), lib_msh.Mesh(args.interior)
-    exterior.tris = exterior.tris[exterior.tris[:,-1]!=2]
-    exterior.tris[:,3] = 2
+    #exterior.tris = exterior.tris[exterior.tris[:,-1]!=2]
+    exterior.tris[:,-1] = 2
     exterior.discardUnused()
-    interior.tris[:,3]  = 1
+    interior.tris[:,-1]  = 1
     interior.fondre(exterior)
     interior.write("mask.mesh")
+
     if intersects("mask.mesh"):
         print("mask is self-intersecting")
         sys.exit(3)
+
     #Run tetgen
-    lib_exe.execute(lib_exe.tetgen + "-pgaYA mask.mesh")
+    lib_exe.execute(lib_exe.tetgen + "-pgaANEFY mask.mesh")
     for f in os.listdir("."):
         if 'mask' in f and ".mesh" not in f and ".py" not in f:
             os.remove(f)
-    lib_exe.execute(lib_exe.mmg3d + "-nosurf mask.1.mesh -out mask.1.o.mesh")#Because the number of triangles is not good, therefore tetrahedra re not read!!
+
+    lib_exe.execute(lib_exe.mmg3d + "-nosurf -nr -hgrad 1.75 mask.1.mesh -out mask.1.o.mesh") #Because the number of triangles is not good, therefore tetrahedra re not read!!
     os.remove("mask.1.o.sol")
     os.remove("mask.mesh")
     os.remove("mask.1.mesh")
@@ -89,32 +93,28 @@ if __name__ == "__main__":
             for i in t[:3]:
                 mesh.verts[i,-1]=1
     #Write the mask
-    mesh.write(args.output)
-    #os.remove("mask.1.o.mesh")
+    mesh.write("mask.2.mesh")
+    os.remove("mask.1.o.mesh")
 
     #Volume remesh
-    lib_exe.execute("mmg3d_O3 %s -o %s -hausd 0.0005 -nosurf -hgrad 1.15 > /dev/null 2>&1" % (args.output, args.output))
+    lib_exe.execute("mmg3d_O3 %s -o %s -hausd 0.005 -nosurf -nr -hgrad 1.75 > /dev/null 2>&1" % ("mask.2.mesh", args.output))
     os.remove(args.output.replace(".mesh", ".sol"))
+    os.remove("mask.2.mesh")
+
 
     #Add a .sol corresponding to the difference between the interior surface and the template
+
+    mesh = lib_msh.Mesh(args.output)
+
     if args.template:
         print("We're here")
         template = lib_msh.Mesh(args.template)
         template.tets = np.array([])
-        template.tris = template.tris[template.tris[:,-1]==1]
         template.discardUnused()
-
-        mesh.tets = np.array([])
-        mesh.discardUnused()
-
-        #mesh = lib_msh.Mesh(args.output.replace(".mesh", ".o.mesh"))
-        print("Wish you were here")
 
         n = len(mesh.verts)
         mesh.vectors = np.zeros((n,3))
-
-        print(len(mesh.verts), len(template.verts))
-        mesh.vectors[:len(template.verts)] = mesh.verts[:len(template.verts),:3] - template.verts[:,:3] #THIS SHOULD BE REPLACED BY THE RESULTS OF MORPHING
+        mesh.vectors[:len(template.verts)] = template.verts[:,:3] - mesh.verts[:len(template.verts),:3] #THIS SHOULD BE REPLACED BY THE RESULTS OF MORPHING
 
         mesh.writeSol( args.output.replace(".mesh", ".sol") )
-mesh.write( args.output )
+        mesh.write( args.output )

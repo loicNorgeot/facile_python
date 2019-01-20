@@ -6,6 +6,7 @@ import lib_msh
 import numpy as np
 from scipy.spatial.distance import cdist
 import shutil
+import multiprocessing as mp
 
 def nearest_neighbor(src, dst):
     all_dists = cdist(src, dst, 'euclidean')
@@ -38,12 +39,13 @@ def create_box(f):
     hausd = 0.02 * np.max(mesh.dims)
     lib_exe.execute( lib_exe.mmg3d + "box.1.mesh -hausd %f -hmax %f > /dev/null 2>&1" % (hausd, hausd) )
 
-def signedDistance(f, box=None):
+def signedDistance(f, box=None, parallel=False):
     if box is not None:
         adapt_box_to(f, box)
     else:
         create_box(f)
-    lib_exe.execute( lib_exe.mshdist + "-ncpu 16 -noscale box.1.o.mesh " + f + " > /dev/null 2>&1")
+    ncpus = mp.cpu_count() if parallel else 1
+    lib_exe.execute( lib_exe.mshdist + "-ncpu " + str(ncpus) + " -noscale box.1.o.mesh " + f + " > /dev/null 2>&1")
     if os.path.exists("box.mesh"): os.remove("box.mesh")
     if os.path.exists("box.1.mesh"): os.remove("box.1.mesh")
 
@@ -54,6 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input",  type=str, help="Input mesh", required=True)
     parser.add_argument("-o", "--output", type=str, help="Output mesh", required=True)
     parser.add_argument("-v", "--volume", type=str, help="Volume mesh to adapt")
+    parser.add_argument("-p", action="store_true",  help="Run in parallel", default=False)
     args = parser.parse_args(sys.argv[1:])
 
     #checks
@@ -61,6 +64,6 @@ if __name__ == "__main__":
     args.output = os.path.abspath(args.output)
     args.volume = os.path.abspath(args.volume) if args.volume is not None else None
 
-    signedDistance(args.input, box=args.volume)
+    signedDistance(args.input, box=args.volume, parallel=args.p)
     lib_exe.execute("mv box.1.o.mesh " + args.output)
     lib_exe.execute("mv box.1.o.sol  " + args.output.replace(".mesh",".sol"))

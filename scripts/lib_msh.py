@@ -310,6 +310,7 @@ class Mesh:
         self.verts[:,:3]*=scale
         self.verts[:,:3]+=otherMesh.center
         self.computeBBox()
+
     def discardUnused(self):
         used = np.zeros(shape=(len(self.verts)),dtype="bool_")
         if len(self.tris)>0:
@@ -339,6 +340,13 @@ class Mesh:
                     newTets[i][j] = newUsed[t]-1
             self.tets = newTets
         self.computeBBox()
+    def deleteLooseVertices(self):
+        verts = []
+        if len(self.tris)>0:
+            verts += np.ravel(self.tris[:,:3]).tolist()
+        if len(self.tets)>0:
+            verts += np.ravel(self.tets[:,:4]).tolist()
+        print(len(set(verts)), len(self.verts))
 
     def getHull(self):
         with open("tmp.node","w") as f:

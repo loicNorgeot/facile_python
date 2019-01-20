@@ -29,14 +29,17 @@ if __name__ == "__main__":
 
     #Clean the mesh and extract the surface
     final = None
-    number_max=-1
-    for f in [x for x in os.listdir(".") if "sphere.d." in x and ".mesh" in x]:
-        number = int(f.split(".")[2])
-        if number>number_max:
-            final = f
+    try:
+        number_max=-1
+        for f in [x for x in os.listdir(".") if "sphere.d." in x and ".mesh" in x]:
+            number = int(f.split(".")[2])
+            if number>number_max:
+                final = f
+    except:
+        final = "sphere.d.mesh"
+
     warped = lib_msh.Mesh(final)
-    ext_ref = 2
-    warped.tris = warped.tris[warped.tris[:,-1] != ext_ref]
+    warped.tris = warped.tris[warped.tris[:,-1] != 2]
     warped.tets = np.array([])
     warped.discardUnused()
     warped.write(args.output)

@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """
 python3 database.py -d FILES/ -t TEMPLATES/
 """
@@ -9,6 +12,7 @@ import argparse
 from shutil import copyfile
 import sys
 import numpy as np
+import tempfile
 
 from lib_paths import *
 
@@ -164,7 +168,7 @@ if __name__ == "__main__":
 
 
     # 7 - Align the models
-
+    """
     def align(group):
         SOURCE = os.path.join(directories["remeshed"], [g for g in group if "Skull" in g][0])
         TARGET = templates["skull"]
@@ -182,6 +186,7 @@ if __name__ == "__main__":
     for g in GROUPS:
         print(g)
     lib_exe.parallel(align, GROUPS)
+    """
 
     # 8 - OPTIONAL: generate a shell for warping from all the skulls we have
     # TOTALLY OPTIONNAL FOR NOW
@@ -194,27 +199,7 @@ if __name__ == "__main__":
     os.remove("merged.mesh")
     """
 
-
-
     # 9 - Warp the bones
-    import tempfile
-
-    #9.1 - Scale to allow the warping to not crash
-    """
-    skullstowarp = [f for f in os.listdir(directories["aligned"]) if "Skull.mesh" in f]
-    print("SKULLSTOWAR\n", skullstowarp)
-    for skull in skullstowarp:
-        with tempfile.TemporaryDirectory() as tmp:
-            IN    = os.path.join(directories["aligned"], skull)
-            TMP1  = os.path.join(tmp, "tmp1_%s" % skull )
-            TMP2  = os.path.join(tmp, "tmp2_%s" % skull )
-            OUT  = os.path.join(directories["aligned"], "towarp_" + skull )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -0.5, -0.5, -0.5) )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, 0.2, 0.2, 0.2) )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
-    """
-
-    #9.2 - Do the warping
     """
     def warp(f):
         with tempfile.TemporaryDirectory() as tmp:
@@ -225,67 +210,34 @@ if __name__ == "__main__":
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
     FILES = [f for f in os.listdir(directories["aligned"]) if "Skull.mesh" in f]
     FILES = [f for f in FILES if f not in os.listdir(directories["warped"])]
-    print("FILES\n",FILES)
     lib_exe.parallel(warp, FILES)
     """
 
-    #9.3 - Scale the skulls back to the last dimensions before the warping
-    """
-    skullstowarp = [f for f in os.listdir(directories["warped"]) if "Skull.mesh" in f and "to_warp" in f]
-    print("SKULLSTOSCALEBACK\n", skullstowarp)
-    for skull in skullstowarp:
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp        = tempfile.TemporaryDirectory()
-            IN    = os.path.join(directories["warped"], skull)
-            TMP1  = os.path.join(tmp, "tmp1_%s" % skull )
-            TMP2  = os.path.join(tmp, "tmp2_%s" % skull )
-            OUT  = os.path.join(directories["warped"], skull.replace("to_warp","") )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -0.5, -0.5, -0.5) )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, 5, 5, 5) )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
-    """
-
-
-
-
-
-
-
-
-    # 10 - Compute the signed distances on the warped bones...
+    # 10 - Compute the signed distances on the warped bones and skins
     """
     def signed(f):
-        IN  = os.path.join(directories["warped"], f)
+        IN  = os.path.join(directories["aligned"], f) if "Skin" in f else os.path.join(directories["warped"], f)
         OUT = os.path.join(directories["signed"], f)
         BOX = templates["box"]
         with tempfile.TemporaryDirectory() as tmp:
             os.chdir(tmp)
-            lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s" % (IN, OUT, BOX))
-    FILES = [f for f in os.listdir(directories["warped"]) if "Skull" in f and f.endswith(".mesh")]
+            lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
+    FILES = []
+    warpedSkulls = [f for f in os.listdir(directories["warped"]) if "Skull" in f and f.endswith(".mesh")]
+    for skull in warpedSkulls:
+        name = skull.split("-")[0]
+        for face in os.listdir(directories["aligned"]):
+            if face.split("-")[0] == name and "Skin.mesh" in face:
+                FILES.append(skull)
+                FILES.append(face)
     FILES = [f for f in FILES if f not in os.listdir(directories["signed"])]
-    FILES = [f for f in FILES if "BENVA" in f]
-    lib_exe.parallel(signed, FILES)
-
-    # 11 - ... and on the faces
-    def signed(f):
-        IN  = os.path.join(directories["aligned"], f)
-        OUT = os.path.join(directories["signed"], f)
-        BOX = templates["box"]
-        with tempfile.TemporaryDirectory() as tmp:
-            os.chdir(tmp)
-            lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s" % (IN, OUT, BOX))
-    FILES = [f for f in os.listdir(directories["aligned"]) if "Skin" in f and f.endswith(".mesh")]
-    NEWFILES = []
-    for f1 in FILES:
-        for f2 in os.listdir(directories["signed"]):
-            if "Skull" in f2:
-                if f1.split("-")[0] == f2.split("-")[0]:
-                    NEWFILES.append(f1)
-                    break
-    FILES = [f for f in NEWFILES if f not in os.listdir(directories["signed"])]
-    lib_exe.parallel(signed, FILES)
+    FILES = [f for f in FILES if "MADAN" not in f and "LAUVI" not in f]
+    for f in FILES:
+        try:
+            signed(f)
+        except:
+            print("%s failed..." % f)
     """
-
 
     #12 - Fill the wrapped surfaces with tetrahedra and an icosphere
     """
@@ -297,20 +249,21 @@ if __name__ == "__main__":
     lib_exe.parallel(fill, FILES)
     """
 
-    # 13 - Morph the appropriate templates to the skull (and the faces = used for later, to have the same mesh for all faces)
-    """
+    # 13 - Morph the appropriate templates to the skull
     def morph(f):
         IN   = os.path.join(directories["signed"], f)
         OUT  = os.path.join(directories["morphed"], f)
         TMP  = templates["morphing_skull"] if "Skull" in f else templates["morphing_face"]
         REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3]
-        lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2]))
-    FILES = [f for f in os.listdir(directories["signed"]) if "Skull" in f and f.endswith("mesh") ]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.chdir(tmp)
+            lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 250))
+    FILES = [f for f in os.listdir(directories["signed"]) if ("Skull" in f or "Skin" in f) and f.endswith("mesh") ]
     FILES = [f for f in FILES if f not in os.listdir(directories["morphed"])]
     lib_exe.parallel(morph, FILES)
-    """
 
     # 14 - Generate "La Masqué"
+    """
     def mask(group):
         INTERIOR  = [ os.path.join(directories["morphed"], g) for g in group if "Skull" in g][0]
         EXTERIOR  = [ os.path.join(directories["morphed"], g) for g in group if "Skin" in g][0]
@@ -322,8 +275,7 @@ if __name__ == "__main__":
     GROUPS = [ [f for f in os.listdir(directories["morphed"]) if ("Skull" in f or "Skin" in f) and case in f] for case in cases]
     GROUPS = [g for g in GROUPS if len(g)==2]
     lib_exe.parallel(mask, GROUPS)
-
-
+    """
 
     ################################################################################
     # 2 - Reconstruction d'un nouveau crane sans masseter
@@ -332,9 +284,10 @@ if __name__ == "__main__":
     """
     TODO pour BIBI = Loïc
     1. Relancer les cas avec une sphere plus légère pour le warping
-    2. S'énerver sur le champ de deplacement dans le crane a l'interieur
+    2. S'énerver sur le champ de deplacement dans le crane a l'interieur = CE SOIR GROS FILS DE P**A
     3. Faire marcher l'elasticité avec le champ de deplacement
-    4. ...
+    4. Faire en sorte de pouvoir relancer le script avec de nouvelles données, sans tout refire à chaque fois. "C'est intéressant" - Lydie.
+    5. Egalement faire le morphing des visages
     """
 
     """

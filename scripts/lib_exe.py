@@ -59,7 +59,7 @@ def parallel(func, items, ncpus=128):
         res = mp.Pool(processes=num).map(func, items )
         return res
     else:
-        print('\033[95m' + "## SKIPPING '" + func.__name__ + ", no data found." + '\033[0m')
+        print('\033[95m' + "## SKIPPING '" + func.__name__ + "', no data found." + '\033[0m')
         pass
 
 def execute(cmd, msg="erreur"):
