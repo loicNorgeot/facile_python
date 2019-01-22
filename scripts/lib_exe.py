@@ -63,14 +63,16 @@ def parallel(func, items, ncpus=128):
         pass
 
 def execute(cmd, msg="erreur"):
-    print("Running '" + cmd + "'")
-    process  = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
-    out, err = [x.strip() for x in process.communicate()]
-    code     = process.returncode
-    if code:
-        print("Error running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
-        print()
-        raise Exception(msg)
+    try:
+        print("Running '" + cmd + "'")
+        process  = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+        out, err = [x.strip() for x in process.communicate()]
+        code     = process.returncode
+        if code:
+            print("Error running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
+            #raise Exception(msg)
+    except:
+        print("Error running '" + cmd + "'\n")
 
 # Functions to create commands
 def python_cmd(f):
