@@ -57,7 +57,7 @@ if __name__ == "__main__":
     #Get the templates and arguments
     args, templates = init()
     NAME = "reconstruction"
-
+    
     # 1 - If needed, convert the .obj or .stl objects to .mesh
     for i,f in enumerate(args.input):
         if f.endswith(".obj") or f.endswith(".stl"):
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     S = 0.8 / np.max(mesh.dims)
     C = mesh.center
     lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (NAME + ".mesh", "tmp.mesh", -C[0], -C[1], -C[2]) )
-    lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % ("tmp.mesh", "tmp.mesh", S, S, S) )
+    lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % ("tmp.mesh", "tmp.mesh", S, S, S))
     lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % ("tmp.mesh", NAME + ".scaled.mesh", 0.5, 0.5, 0.5) )
     os.remove("tmp.mesh")
 
@@ -86,25 +86,28 @@ if __name__ == "__main__":
     # 5 - Align
     lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (NAME + ".remeshed.mesh", templates["skull"], NAME + ".matrix.txt"))
     lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (NAME + ".remeshed.mesh", NAME + ".aligned.mesh", NAME + ".matrix.txt"))
-
+    
+    
     # 6 - Warp
     lib_exe.execute( lib_exe.python_cmd("warp.py")
         + "-i %s -o %s -t %s"
         % (NAME + ".aligned.mesh", NAME + ".warped.mesh", templates["sphere"])
     )
 
+    """
     # 7 - Signed distance
     lib_exe.execute( lib_exe.python_cmd("signed.py")
         + "-i %s -o %s -v %s -p"
         % (NAME + ".warped.mesh", NAME + ".signed.mesh", templates["box"])
     )
 
+    
     # 8 - Morph the template to this warped skull
     lib_exe.execute( lib_exe.python_cmd("morph.py")
         + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d"
-        % (templates["morphing_skull"], NAME + ".signed.mesh", NAME + ".morphed.mesh", 10, 2, 0, 250)
+        % (templates["morphing_skull"], NAME + ".signed.mesh", NAME + ".morphed.mesh", 10, 2, 0, 1500)
     )
-
+    
     # 9 - Find the closest of all the skulls that was warped before
     def distance(a,b):
         return ( (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2 ) **0.5
@@ -123,7 +126,10 @@ if __name__ == "__main__":
             MEANS.append([i, mean, f])
     case = MORPHED[MEANS[np.argmin([mean[1] for mean in MEANS])][0]].split("-")[0]
     print(case)
-
+    """
+	
+    """
+    Du coup on la fait avant
     # 10 - Create a mask with the morphed skull and face of the closest match, and add the vector field.
     #case  = "BENCA"
     skull = os.path.join(args.morphed, "%s-Skull.mesh" % case)
@@ -132,19 +138,23 @@ if __name__ == "__main__":
         + "-i %s -e %s -o %s -t %s"
         % ( skull, skin, NAME + ".lamasque.mesh", NAME + ".morphed.mesh")
     )
+    """
+    """
+    #JUSTE CAR JE N4AI PAS TOUS LES MASQUES J4EN CHOISI UN AUTRE ASSEZ "PROCHE"
+    case = "ALICH"
 
     #Create the elasticity file
-    with open(NAME + ".lamasque.elas", "w") as f:
+    with open(NAME + "_la_masque.elas", "w") as f:
         f.write("Dirichlet\n1\n1 vertex f\n\n")
         f.write("Lame\n1\n2 186000. 3400.\n\n")
-
+    
     # 11 - Run the elasticity with the given input = last step
     lib_exe.execute( lib_exe.elasticity
         + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
-        % (NAME + ".lamasque.mesh", NAME + ".lamasque.sol", NAME + ".lamasque.elas", NAME + ".elasticity.sol", 1000, 0.00000001)
+        % (os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA/masked", case + "_la_masque.mesh"), os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA/masked", case + "_la_masque.sol"), NAME + "_la_masque.elas", NAME + ".elasticity.sol", 2000, 0.00000001)
     )
-    shutil.copyfile(NAME + ".lamasque.mesh", NAME + ".elasticity.mesh")
-
+    shutil.copyfile(os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA/masked", case + "_la_masque.mesh"), NAME + ".elasticity.mesh")
+    
     #Adjust the final reconstruction
     mesh = lib_msh.Mesh(NAME + ".elasticity.mesh")
     mesh.readSol()
@@ -153,3 +163,4 @@ if __name__ == "__main__":
     mesh.tris = mesh.tris[mesh.tris[:,-1]==2]
     mesh.discardUnused()
     mesh.write(NAME + ".final.mesh")
+    """

@@ -35,7 +35,7 @@ if __name__ == "__main__":
     if args.template:
         args.template = os.path.abspath(args.template)
 
-
+    """
     #check for intersections
     if intersects(args.interior):
         print("interior surface is self-intersecting")
@@ -43,20 +43,20 @@ if __name__ == "__main__":
     if intersects(args.exterior):
         print("exterior surface is self-intersecting")
         sys.exit(2)
-
+    """
+    
     #Merge the meshes and run tetgen
     exterior, interior = lib_msh.Mesh(args.exterior), lib_msh.Mesh(args.interior)
     #exterior.tris = exterior.tris[exterior.tris[:,-1]!=2]
     exterior.tris[:,-1] = 2
     exterior.discardUnused()
-    interior.tris[:,-1]  = 1
+    interior.tris[:,-1] = 1
     interior.fondre(exterior)
     interior.write("mask.mesh")
-
     if intersects("mask.mesh"):
         print("mask is self-intersecting")
         sys.exit(3)
-
+    
     #Run tetgen
     lib_exe.execute(lib_exe.tetgen + "-pgaANEFY mask.mesh")
     for f in os.listdir("."):
