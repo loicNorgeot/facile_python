@@ -114,15 +114,15 @@ if __name__ == "__main__":
 	### Etape d'ajout du masseter à la reconstruction ###
 	# Il me faut faire la reconstruction sur les merge 1- juste Crane 2- Crane et vrai mass 3- Crane et mass reconstruit
     if MERGEPCAMASS == True:
-
+        """
         # 1 - Cut the masseters in half
         def split(group):
             for g in group:
                 mass = [g for g in group if "Mass" in g][0]
-                print(mass)
+                #print(mass)
                 # Translate everything so that the center of the skull is on 0,0,0
                 centerMass = lib_msh.Mesh(os.path.join(directories["mesh"], mass)).center
-                print(centerMass)
+                #print(centerMass)
             #Scale to one unit and center
                 IN    = os.path.join(directories["mesh"], g)
                 TMP   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.mesh"))
@@ -148,7 +148,7 @@ if __name__ == "__main__":
                 S = 0.008
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_R2, TMP_R3, S, S, S) )
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_L2, TMP_L3, S, S, S) )
-            #Move the halves to .5 .5 .5
+            #Move the halves to .5 .5 .5 (ou sur le centre du template non ???)
                 OUT_R = os.path.join(directories["splitted"], g.replace(".mesh", ".R.raw.mesh"))
                 OUT_L = os.path.join(directories["splitted"], g.replace(".mesh", ".L.raw.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R3, OUT_R, .5, .5, .5))
@@ -163,7 +163,7 @@ if __name__ == "__main__":
                 os.remove(TMP_L3)
                 os.remove(TMP_R3)
         cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass" in f])
-        print(cases)
+        #print(cases)
         FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and "Mass" in f]for case in cases]
         #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
         FILES.sort(key = lambda x:x[0])
@@ -180,9 +180,9 @@ if __name__ == "__main__":
         FILES = [f for f in os.listdir(directories["splitted"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".remeshed.mesh") not in os.listdir(directories["splitted"])]
         print(FILES)
         lib_exe.parallel(remesh, FILES)
-
+        """
         # 3 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
-        # A faire dans l'absolue
+        # A faire dans l'absolue avec le template de mass  == L4ELISPOIDE que j'ai sur mon ordi !!
         """
         def align(f):
             SOURCE = os.path.join(directories["splitted"], f)
@@ -195,28 +195,34 @@ if __name__ == "__main__":
         lib_exe.parallel(align, FILES)
         """
         # 4 - Compute the signed distances on the masseter
-        """
+
         def signed(f):
             IN  = os.path.join(directories["splitted"], f)
-            OUT = os.path.join(directories["signed"], f)
+            OUT = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".signed.mesh"))
             BOX = templates["box"]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
                 lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
-        FILES = []
-        warpedSkulls = [f for f in os.listdir(directories["warped"]) if "Skull" in f and f.endswith(".mesh")]
-        for skull in warpedSkulls:
-            name = skull.split("-")[0]
-            for face in os.listdir(directories["aligned"]):
-                if face.split("-")[0] == name and "Skin.mesh" in face:
-                    FILES.append(skull)
-                    FILES.append(face)
-        FILES = [f for f in FILES if f not in os.listdir(directories["signed"])]
+        FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".signed.mesh") not in os.listdir(directories["splitted"])]
+
         for f in FILES:
             try:
                 signed(f)
             except:
                 print("%s failed..." % f)
+
+        # 5 - Morph the appropriate templates to the skull
+        """
+        def morph(f):
+            IN   = os.path.join(directories["splitted"], f)
+            OUT  = os.path.join(directories["splitted"], f.replace(".signed.mesh", ".morphed.mesh"))
+            TMP  = templates["morphing_mass"] # dans l'idéal mon template est la fameuse ellipsoïde ! il faut que je la retrouve sur mon ordi !!!!
+            REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3] # A VERIFIER
+            with tempfile.TemporaryDirectory() as tmp:
+                os.chdir(tmp)
+                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1200))
+        FILES = [f for f in os.listdir(directories["splitted"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["splitted"])]
+        lib_exe.parallel(morph, FILES)
         """
 
     # 4 - Merge the bones (skull, mandibles and teeth) together
@@ -237,6 +243,7 @@ if __name__ == "__main__":
     def scale(group):
         #Start here
         skull = [g for g in group if "Skull" in g][0]
+        #la c'est le premier de la liste mais ca serait plus logique de le faire sur centre de chaque crane indépendament OU sur le centre du crane template éventuellement ...
         # 1 - Translate everything so that the center of the skull is on 0,0,0
         centerskull = lib_msh.Mesh(os.path.join(directories["merged"], skull)).center
         for g in group:
