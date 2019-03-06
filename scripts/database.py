@@ -16,7 +16,8 @@ import tempfile
 
 from lib_paths import *
 
-MERGEMASSETERSTOO = False
+MERGEREALMASS = False
+MERGEPCAMASS = True
 
 #arguments
 def get_arguments():
@@ -47,7 +48,8 @@ def create_templates_and_directories(args):
         "scaled",
         "remeshed",
         "merged",
-        "mergedMass",
+        "mergedRealMass",
+        "mergedPCAMass",
         "aligned",
         "warped",
         "filled",
@@ -109,8 +111,71 @@ if __name__ == "__main__":
     lib_exe.parallel(check, GROUPS)
     """
 
+	### Etape d'ajout du masseter à la reconstruction ###
+	# Il me faut faire la reconstruction sur les merge 1- juste Crane 2- Crane et vrai mass 3- Crane et mass reconstruit
+    if MERGEPCAMASS == True:
+        print('plouf')
+
+        # 1 - Cut the raw mandibles and masseters in half
+        def split(group):
+            for g in group:
+                mass = [g for g in group if "Mass" in g][0]
+                print(mass)
+                # Translate everything so that the center of the skull is on 0,0,0
+                centerMass = lib_msh.Mesh(os.path.join(directories["mesh"], mass)).center
+                print(centerMass)
+            #Scale to one unit and center
+                IN    = os.path.join(directories["mesh"], g)
+                TMP   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.mesh"))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -c %f %f %f" % (IN, TMP, -centerMass[0], -centerMass[1], -centerMass[2]))
+            #Split in half
+                TMP_R = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.R.mesh"))
+                TMP_L = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.L.mesh"))
+                lib_exe.execute(lib_exe.blender_cmd("split.py") + "-i %s -o %s -x %d" %  (TMP, TMP_R, 1))
+                lib_exe.execute(lib_exe.blender_cmd("split.py") + "-i %s -o %s -x %d" %  (TMP, TMP_L, -1))
+            #Move the halves to .5 .5 .5
+                OUT_R = os.path.join(directories["splitted"], g.replace(".mesh", ".R.raw.mesh"))
+                OUT_L = os.path.join(directories["splitted"], g.replace(".mesh", ".L.raw.mesh"))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R, OUT_R, .75, .5, .5))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L, OUT_L, .75, .5, .5))
+            #Remove the temporary files
+                os.remove(TMP)
+                os.remove(TMP_L)
+                os.remove(TMP_R)
+        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass" in f])
+        print(cases)
+        FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and "Mass" in f]for case in cases]
+        #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
+        FILES.sort(key = lambda x:x[0])
+        print(FILES)
+        lib_exe.parallel(split, FILES, 1)
+
+
     """
+        # 2 - Remesh everything
+        def remesh(f):
+            IN    = os.path.join(directories["splitted"], f)
+            HAUSD = 0.0025
+            OUT   = os.path.join(directories["splitted"], f.replace(".raw.mesh", ".remeshed.mesh"))
+            lib_exe.execute( lib_exe.mmgs + "%s -nr -nreg -hausd %f -o %s > /dev/null 2>&1" % (IN, HAUSD, OUT))
+            FILES = [f for f in os.listdir(directories["splitted"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".remeshed.mesh") not in os.listdir(directories["splitted"])]
+            lib_exe.parallel(remesh, FILES)
+
+        # 3 - Align the mandibles and the masseters
+        def align(f):
+            SOURCE = os.path.join(directories["splitted"], f)
+            TARGET = templates["masseter"] if "mass" in f else template["mandible"]
+            MAT    = os.path.join(directories["splitted"], f[:4] + "icp_matrix.txt")
+            OUT    = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".aligned.mesh"))
+            lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (SOURCE, TARGET, MAT))
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
+        FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".aligned.mesh") not in os.listdir(directories["splitted"])]
+        lib_exe.parallel(align, FILES)
+    """
+
+
     # 4 - Merge the bones (skull, mandibles and teeth) together
+    """
     def merge(group):
         OUT   = os.path.join(directories["merged"], group[0][:6] + "Skull.mesh")
         lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
@@ -120,10 +185,10 @@ if __name__ == "__main__":
     GROUPS = [f for f in GROUPS if f not in os.listdir(directories["merged"])]
     print(GROUPS)
     lib_exe.parallel(merge, GROUPS)
-    
+    """
 
     # 5 - Scale everything
-    
+
     def scale(group):
         #Start here
         skull = [g for g in group if "Skull" in g][0]
@@ -158,8 +223,8 @@ if __name__ == "__main__":
     print(FILES)
     #Execute
     lib_exe.parallel(scale, FILES)
-    
-    
+
+    """
     # 6 - Remesh all the files
     def remesh(f):
         IN    = os.path.join(directories["scaled"], f)
@@ -170,11 +235,11 @@ if __name__ == "__main__":
     FILES = [f for f in FILES if f not in os.listdir(directories["remeshed"])]
     print(FILES)
     lib_exe.parallel(remesh, FILES, 2)
-    
 
-    
+
+
     # 7 - Align the models
-    
+
     def align(group):
         SOURCE = os.path.join(directories["remeshed"], [g for g in group if "Skull" in g][0])
         TARGET = templates["skull"]
@@ -193,7 +258,7 @@ if __name__ == "__main__":
         print(g)
     lib_exe.parallel(align, GROUPS)
     """
-	
+
     # 8 - OPTIONAL: generate a shell for warping from all the skulls we have
     # TOTALLY OPTIONNAL FOR NOW
     """
@@ -204,7 +269,7 @@ if __name__ == "__main__":
     lib_exe.execute( lib_exe.python_cmd("shell.py") + "-i %s -o %s" % ("merged.mesh", "shell.mesh"))
     os.remove("merged.mesh")
     """
-    
+
     # 9 - Warp the bones
     """
     def warp(f):
@@ -217,10 +282,10 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories["aligned"]) if "Skull.mesh" in f]
     FILES = [f for f in FILES if f not in os.listdir(directories["warped"])]
     lib_exe.parallel(warp, FILES)
-    
+
 
     # 10 - Compute the signed distances on the warped bones and skins
-    
+
     def signed(f):
         IN  = os.path.join(directories["aligned"], f) if "Skin" in f else os.path.join(directories["warped"], f)
         OUT = os.path.join(directories["signed"], f)
@@ -244,7 +309,7 @@ if __name__ == "__main__":
         except:
             print("%s failed..." % f)
     """
-    
+
     #12 - Fill the wrapped surfaces with tetrahedra and an icosphere
     """
     def fill(f):
@@ -254,7 +319,7 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories["warped"]) if f not in os.listdir(directories["filled"]) if "GROJU" in f]
     lib_exe.parallel(fill, FILES)
     """
-    
+
     # 13 - Morph the appropriate templates to the skull
     """
     def morph(f):
@@ -270,7 +335,7 @@ if __name__ == "__main__":
     lib_exe.parallel(morph, FILES)
     """
     # 14 - Generate "La Masqué"
-    
+    """
     def mask(group):
         INTERIOR  = [ os.path.join(directories["morphed"], g) for g in group if "Skull" in g][0]
         EXTERIOR  = [ os.path.join(directories["morphed"], g) for g in group if "Skin" in g][0]
@@ -285,8 +350,8 @@ if __name__ == "__main__":
     GROUPS = [g for g in GROUPS if g not in os.listdir(directories["masked"])]
     #print(GROUPS)
     lib_exe.parallel(mask, GROUPS, 1) #ne fonctionne pas sur plus d'un processeur à la fois ... ?
-    
-	
+    """
+
 
 
 
