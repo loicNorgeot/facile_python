@@ -29,8 +29,8 @@ if __name__ == "__main__":
     # elref: Elements inside the fixed surface
     # bref: Follower elements
     shutil.copyfile(args.template, "template.mesh")
-    cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  " % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
-    #cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  > /dev/null 2>&1" % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
+    #cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  " % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
+    cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  > /dev/null 2>&1" % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
     lib_exe.execute(cmd)
 
     #Clean the mesh

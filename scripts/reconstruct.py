@@ -57,7 +57,7 @@ if __name__ == "__main__":
     #Get the templates and arguments
     args, templates = init()
     NAME = "reconstruction"
-    
+    """
     # 1 - If needed, convert the .obj or .stl objects to .mesh
     for i,f in enumerate(args.input):
         if f.endswith(".obj") or f.endswith(".stl"):
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         % (NAME + ".aligned.mesh", NAME + ".warped.mesh", templates["sphere"])
     )
 
-    """
+    
     # 7 - Signed distance
     lib_exe.execute( lib_exe.python_cmd("signed.py")
         + "-i %s -o %s -v %s -p"
@@ -139,9 +139,9 @@ if __name__ == "__main__":
         % ( skull, skin, NAME + ".lamasque.mesh", NAME + ".morphed.mesh")
     )
     """
-    """
+    
     #JUSTE CAR JE N4AI PAS TOUS LES MASQUES J4EN CHOISI UN AUTRE ASSEZ "PROCHE"
-    case = "ALICH"
+    case = "ADASA"
 
     #Create the elasticity file
     with open(NAME + "_la_masque.elas", "w") as f:
@@ -151,9 +151,9 @@ if __name__ == "__main__":
     # 11 - Run the elasticity with the given input = last step
     lib_exe.execute( lib_exe.elasticity
         + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
-        % (os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA/masked", case + "_la_masque.mesh"), os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA/masked", case + "_la_masque.sol"), NAME + "_la_masque.elas", NAME + ".elasticity.sol", 2000, 0.00000001)
+        % (os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.mesh"), os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.sol"), NAME + "_la_masque.elas", NAME + ".elasticity.sol", 2000, 0.00000001)
     )
-    shutil.copyfile(os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA/masked", case + "_la_masque.mesh"), NAME + ".elasticity.mesh")
+    shutil.copyfile(os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.mesh"), NAME + ".elasticity.mesh")
     
     #Adjust the final reconstruction
     mesh = lib_msh.Mesh(NAME + ".elasticity.mesh")
@@ -163,4 +163,4 @@ if __name__ == "__main__":
     mesh.tris = mesh.tris[mesh.tris[:,-1]==2]
     mesh.discardUnused()
     mesh.write(NAME + ".final.mesh")
-    """
+    

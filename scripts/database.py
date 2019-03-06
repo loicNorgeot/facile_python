@@ -47,6 +47,7 @@ def create_templates_and_directories(args):
         "scaled",
         "remeshed",
         "merged",
+        "mergedMass",
         "aligned",
         "warped",
         "filled",
@@ -215,8 +216,8 @@ if __name__ == "__main__":
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
     FILES = [f for f in os.listdir(directories["aligned"]) if "Skull.mesh" in f]
     FILES = [f for f in FILES if f not in os.listdir(directories["warped"])]
-    lib_exe.parallel(warp, FILES, 10)
-    """
+    lib_exe.parallel(warp, FILES)
+    
 
     # 10 - Compute the signed distances on the warped bones and skins
     
@@ -242,8 +243,8 @@ if __name__ == "__main__":
             signed(f)
         except:
             print("%s failed..." % f)
+    """
     
-	
     #12 - Fill the wrapped surfaces with tetrahedra and an icosphere
     """
     def fill(f):
@@ -255,7 +256,7 @@ if __name__ == "__main__":
     """
     
     # 13 - Morph the appropriate templates to the skull
-    
+    """
     def morph(f):
         IN   = os.path.join(directories["signed"], f)
         OUT  = os.path.join(directories["morphed"], f)
@@ -267,7 +268,7 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories["signed"]) if ("Skull" in f or "Skin" in f) and f.endswith("mesh") ]
     FILES = [f for f in FILES if f not in os.listdir(directories["morphed"])]
     lib_exe.parallel(morph, FILES)
-    
+    """
     # 14 - Generate "La Masqué"
     
     def mask(group):
@@ -281,7 +282,8 @@ if __name__ == "__main__":
     GROUPS = [ [f for f in os.listdir(directories["morphed"]) if ("Skull" in f or "Skin" in f) and case in f] for case in cases]
     print(GROUPS)
     GROUPS = [g for g in GROUPS if len(g)==2]
-    print(GROUPS)
+    GROUPS = [g for g in GROUPS if g not in os.listdir(directories["masked"])]
+    #print(GROUPS)
     lib_exe.parallel(mask, GROUPS, 1) #ne fonctionne pas sur plus d'un processeur à la fois ... ?
     
 	

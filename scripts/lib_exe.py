@@ -52,7 +52,7 @@ def debug():
 
     return true_decorator
 
-def parallel(func, items, ncpus = 4): #ncpus=128):
+def parallel(func, items, ncpus = 14): #ncpus=128):
     if len(items)>0:
         num = min( ncpus, min(len(items), mp.cpu_count()-1 ))
         print('\033[95m' + "## EXECUTING '" + func.__name__ + "' on " + str(len(items)) + " cases and " + str(num) + " process(es)." + '\033[0m')
