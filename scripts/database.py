@@ -126,30 +126,42 @@ if __name__ == "__main__":
             #Scale to one unit and center
                 IN    = os.path.join(directories["mesh"], g)
                 TMP   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.mesh"))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -c %f %f %f" % (IN, TMP, -centerMass[0], -centerMass[1], -centerMass[2]))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP, -centerMass[0], -centerMass[1], -centerMass[2]))
             #Split in half
                 TMP_R = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.R.mesh"))
                 TMP_L = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.L.mesh"))
+                print(TMP_R)
                 lib_exe.execute(lib_exe.blender_cmd("split.py") + "-i %s -o %s -x %d" %  (TMP, TMP_R, 1))
                 lib_exe.execute(lib_exe.blender_cmd("split.py") + "-i %s -o %s -x %d" %  (TMP, TMP_L, -1))
             # Center tmpL et tmpR en zéro pour pouvoir faire le scalling et le move en 0.5 0.5 0.5
-                centerR = TMP_R.center
-                centerL = TMP_L.center
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -c %f %f %f" % (TMP_R, TMP_R, -centerR[0], -centerR[1], -centerR[2]))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -c %f %f %f" % (TMP_L, TMP_L, -centerL[0], -centerL[1], -centerL[2]))
+                centerR = lib_msh.Mesh(os.path.join(directories["mesh"],TMP_R)).center
+                centerL = lib_msh.Mesh(os.path.join(directories["mesh"],TMP_L)).center
+                TMP_R2 = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.R2.mesh"))
+                TMP_L2 = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.L2.mesh"))
+                print(centerR)
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R, TMP_R2, -centerR[0], -centerR[1], -centerR[2]))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L, TMP_L2, -centerL[0], -centerL[1], -centerL[2]))
+
             # Scale by 0.007
-                S = 0.007
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_R, TMP_R, S, S, S) )
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_L, TMP_L, S, S, S) )
+                TMP_R3 = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.R3.mesh"))
+                TMP_L3 = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.L3.mesh"))
+                S = 0.008
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_R2, TMP_R3, S, S, S) )
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_L2, TMP_L3, S, S, S) )
             #Move the halves to .5 .5 .5
                 OUT_R = os.path.join(directories["splitted"], g.replace(".mesh", ".R.raw.mesh"))
                 OUT_L = os.path.join(directories["splitted"], g.replace(".mesh", ".L.raw.mesh"))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R, OUT_R, .5, .5, .5))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L, OUT_L, .5, .5, .5))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R3, OUT_R, .5, .5, .5))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L3, OUT_L, .5, .5, .5))
+
             #Remove the temporary files
                 os.remove(TMP)
                 os.remove(TMP_L)
                 os.remove(TMP_R)
+                os.remove(TMP_L2)
+                os.remove(TMP_R2)
+                os.remove(TMP_L3)
+                os.remove(TMP_R3)
         cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass" in f])
         print(cases)
         FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and "Mass" in f]for case in cases]
