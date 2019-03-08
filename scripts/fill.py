@@ -54,7 +54,7 @@ if __name__=="__main__":
     final = lib_msh.Mesh(args.output)
     for i,t in enumerate(final.tris):
         vert1 = final.verts[t[0]]
-        if distance(vert1, [0.5, 0.5, 0.65]) < 0.12:
+        if distance(vert1, [0.5, 0.5, 0.5]) < 0.06:
             final.tris[i,-1] = 10
     final.write(args.output)
 

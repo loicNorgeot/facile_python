@@ -36,7 +36,7 @@ def create_templates_and_directories(args):
     Looks in the directory associated with the templates, for a skull.mesh file for instance.
     If skull.mesh is found, then a variable templates["skull"] becomes available.
     """
-    templateNames = ["masseter", "mandible", "skull", "sphere", "morphing_face", "morphing_skull", "box"]
+    templateNames = ["test2", "ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skull", "box"]
     templates     = {}
     for d in templateNames:
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
@@ -169,8 +169,9 @@ if __name__ == "__main__":
         FILES.sort(key = lambda x:x[0])
         print(FILES)
         lib_exe.parallel(split, FILES)
-
+        """
         # 2 - Remesh everything
+        """
         def remesh(f):
             IN    = os.path.join(directories["splitted"], f)
             HAUSD = 0.0025
@@ -182,12 +183,11 @@ if __name__ == "__main__":
         lib_exe.parallel(remesh, FILES)
         """
         # 3 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
-        # A faire dans l'absolue avec le template de mass  == L4ELISPOIDE que j'ai sur mon ordi !!
         """
         def align(f):
             SOURCE = os.path.join(directories["splitted"], f)
-            TARGET = templates["masseter"] if "mass" in f else template["mandible"]
-            MAT    = os.path.join(directories["splitted"], f[:4] + "icp_matrix.txt")
+            TARGET = templates["ellipsoide"]
+            MAT    = os.path.join(directories["splitted"], f[:13] + "icp_matrix.txt")
             OUT    = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".aligned.mesh"))
             lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (SOURCE, TARGET, MAT))
             lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
@@ -195,35 +195,35 @@ if __name__ == "__main__":
         lib_exe.parallel(align, FILES)
         """
         # 4 - Compute the signed distances on the masseter
-
+        """
         def signed(f):
             IN  = os.path.join(directories["splitted"], f)
-            OUT = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".signed.mesh"))
+            OUT = os.path.join(directories["splitted"], f.replace(".aligned.mesh", ".signed.mesh"))
             BOX = templates["box"]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
                 lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".signed.mesh") not in os.listdir(directories["splitted"])]
-
-        for f in FILES:
-            try:
-                signed(f)
-            except:
-                print("%s failed..." % f)
-
-        # 5 - Morph the appropriate templates to the skull
+        FILES = [f for f in os.listdir(directories["splitted"]) if ".aligned.mesh" in f and f.replace(".aligned.mesh", ".signed.mesh") not in os.listdir(directories["splitted"])]
+        lib_exe.parallel(signed, FILES)
+        # for f in FILES:
+        #     try:
+        #         signed(f)
+        #     except:
+        #         print("%s failed..." % f)
         """
+        # 5 - Morph the appropriate templates to the skull
+
         def morph(f):
             IN   = os.path.join(directories["splitted"], f)
             OUT  = os.path.join(directories["splitted"], f.replace(".signed.mesh", ".morphed.mesh"))
-            TMP  = templates["morphing_mass"] # dans l'idéal mon template est la fameuse ellipsoïde ! il faut que je la retrouve sur mon ordi !!!!
-            REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3] # A VERIFIER
+            TMP  = templates["morphing_mass"]
+            REFS = [10, 2, 0]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
-                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1200))
+                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1000))
         FILES = [f for f in os.listdir(directories["splitted"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["splitted"])]
         lib_exe.parallel(morph, FILES)
-        """
+
 
     # 4 - Merge the bones (skull, mandibles and teeth) together
     """
@@ -365,10 +365,10 @@ if __name__ == "__main__":
     #12 - Fill the wrapped surfaces with tetrahedra and an icosphere
     """
     def fill(f):
-        IN  = os.path.join(directories["warped"], f)
-        OUT = os.path.join(directories["filled"], f)
-        lib_exe.execute( lib_exe.python_cmd("fill.py") + "-i %s -o %s -c 0.5 0.5 0.65 -r 0.1" % (IN, OUT))
-    FILES = [f for f in os.listdir(directories["warped"]) if f not in os.listdir(directories["filled"]) if "GROJU" in f]
+        IN  = os.path.join(directories["splitted"], f)
+        OUT = os.path.join(directories["splitted"], f)
+        lib_exe.execute( lib_exe.python_cmd("fill.py") + "-i %s -o %s -c 0.5 0.5 0.5 -r 0.05" % (IN, OUT))
+    FILES = [f for f in os.listdir(directories["splitted"]) if "test2" in f]
     lib_exe.parallel(fill, FILES)
     """
 
