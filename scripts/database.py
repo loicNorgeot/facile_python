@@ -232,24 +232,36 @@ if __name__ == "__main__":
             REFS = [10, 2, 0]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
-                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 50))
+                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1800))
         FILES = [f for f in os.listdir(directories["splitted"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["splitted"])]
         lib_exe.parallel(morph, FILES)
 
         # 6 - PCA des Masseters
-
+        """
         def pca(group):
+            group = [f for f in group]
+            print(group[0])
             for g in group:
                 newGroup = group[group!=g]
+                print(newGroup)
                 TRAINING = os.path.join(directories["splitted"], newGroup)
                 IN = os.path.join(directories["splitted"], g)
                 OUT  = os.path.join(directories["splitted"], g.replace(".morphed.mesh", ".pca.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
+
+        cases = set([(f.split(".")[0] + "." +f.split(".")[1]) for f in os.listdir(directories["splitted"]) if "morphed.mesh" in f])
+        print(cases)
+        FILES = [[f for f in os.listdir(directories["splitted"]) if f.startswith(case) and "morphed.mesh" in f]for case in cases]
+        #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
+        FILES.sort(key = lambda x:x[0])
+        print(FILES)
+        """
+        #FILES = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
+        #print(FILES)
         lib_exe.parallel(pca, FILES)
 
         # 7 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
-
+        """
         def replace(group):
             # 1 - inverser l'alignement serait normalement la première étape
             for g in group:
@@ -281,6 +293,7 @@ if __name__ == "__main__":
 
         FILES = [f for f in os.listdir(directories["splitted"]) if ".pca.mesh" in f and f.replace(".pca.mesh", ".recons.mesh") not in os.listdir(directories["splitted"])]
         lib_exe.parallel(replace, FILES)
+        """
 
     # 4 - Merge the bones (skull, mandibles and teeth) together
     """
