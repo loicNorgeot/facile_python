@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     #Run the PCA to reconstruct the unknown mesh
     unknown = msh.Mesh(args.unknown)
-    X = PCA(DATA, unknown.verts[:,:3], n=15)
+    X = PCA(DATA, unknown.verts[:,:3], n=5)
 
     #Write it
     mesh=msh.Mesh()
