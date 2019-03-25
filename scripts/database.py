@@ -114,7 +114,7 @@ if __name__ == "__main__":
 	### Etape d'ajout du masseter à la reconstruction ###
 	# Il me faut faire la reconstruction sur les merge 1- juste Crane 2- Crane et vrai mass 3- Crane et mass reconstruit
     if MERGEPCAMASS == True:
-
+        """
         # 1 - Cut the masseters in half
         def split(group):
             for g in group:
@@ -181,9 +181,9 @@ if __name__ == "__main__":
         FILES.sort(key = lambda x:x[0])
         print(FILES)
         lib_exe.parallel(split, FILES)
-
+        """
         # 2 - Remesh everything
-
+        """
         def remesh(f):
             IN    = os.path.join(directories["splitted"], f)
             HAUSD = 0.0025
@@ -193,9 +193,9 @@ if __name__ == "__main__":
         FILES = [f for f in os.listdir(directories["splitted"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".remeshed.mesh") not in os.listdir(directories["splitted"])]
         print(FILES)
         lib_exe.parallel(remesh, FILES)
-
+        """
         # 3 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
-
+        """
         def align(f):
             SOURCE = os.path.join(directories["splitted"], f)
             TARGET = templates["ellipsoide"]
@@ -205,26 +205,26 @@ if __name__ == "__main__":
             lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
         FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".aligned.mesh") not in os.listdir(directories["splitted"])]
         lib_exe.parallel(align, FILES)
-
-        # 4 - Compute the signed distances on the masseter
-
+        """
+        # 4 - Compute the signed distances on the masseter # REMPLACER remeshed par aligned si je veux intégrer l'alignement
+        """
         def signed(f):
             IN  = os.path.join(directories["splitted"], f)
-            OUT = os.path.join(directories["splitted"], f.replace(".aligned.mesh", ".signed.mesh"))
+            OUT = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".signed.mesh"))
             BOX = templates["box"]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
                 lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".aligned.mesh" in f and f.replace(".aligned.mesh", ".signed.mesh") not in os.listdir(directories["splitted"])]
+        FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".signed.mesh") not in os.listdir(directories["splitted"])]
         lib_exe.parallel(signed, FILES)
         # for f in FILES:
         #     try:
         #         signed(f)
         #     except:
         #         print("%s failed..." % f)
-
-        # 5 - Morph the appropriate templates to the skull
-
+        """
+        # 5 - Morph the appropriate templates to the masseter
+        """
         def morph(f):
             IN   = os.path.join(directories["splitted"], f)
             OUT  = os.path.join(directories["splitted"], f.replace(".signed.mesh", ".morphed.mesh"))
@@ -235,13 +235,15 @@ if __name__ == "__main__":
                 lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1800))
         FILES = [f for f in os.listdir(directories["splitted"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["splitted"])]
         lib_exe.parallel(morph, FILES)
-
-        # 6 - PCA des Masseters
         """
+        # 6 - PCA des Masseters
+
         def pca(group):
-            group = [f for f in group]
-            print(group[0])
+            #group = [f for f in group]
+            #print(group)
             for g in group:
+                #print(g)
+                #print(group)
                 newGroup = group[group!=g]
                 print(newGroup)
                 TRAINING = os.path.join(directories["splitted"], newGroup)
@@ -250,15 +252,16 @@ if __name__ == "__main__":
                 lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
 
         cases = set([(f.split(".")[0] + "." +f.split(".")[1]) for f in os.listdir(directories["splitted"]) if "morphed.mesh" in f])
-        print(cases)
+        #print(cases)
         FILES = [[f for f in os.listdir(directories["splitted"]) if f.startswith(case) and "morphed.mesh" in f]for case in cases]
         #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
         FILES.sort(key = lambda x:x[0])
-        print(FILES)
-        """
-        #FILES = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
         #print(FILES)
-        lib_exe.parallel(pca, FILES)
+
+        TEST = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
+        #print(TEST)
+        pca(TEST)
+        #lib_exe.parallel(pca, TEST)
 
         # 7 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
         """

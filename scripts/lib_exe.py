@@ -69,7 +69,8 @@ def execute(cmd, msg="erreur"):
         out, err = [x.strip() for x in process.communicate()]
         code     = process.returncode
         if code:
-            print("Error running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
+            print('\033[31m' + "Error" + '\033[37m' + "running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
+            # j'ai tenté de mettre de la ciouleur sur le mot erreur si bug supprimer les deux éléments encadrant "Error"
             #raise Exception(msg)
     except:
         print("Error running '" + cmd + "'\n")

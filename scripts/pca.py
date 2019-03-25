@@ -3,7 +3,7 @@ from scipy.spatial.distance import cdist
 import os
 import argparse
 import sys
-import lib_msh
+import lib_msh as msh
 
 def scalar(d1,d2):
     return np.sum(np.multiply(d1,d2))
@@ -28,6 +28,7 @@ def get_principal_components(v, d):
     return pc, pcn
 def reconstruct(pcn, d, n=None):
     alpha = np.array([[scalar(x,y) for y in pcn] for x in d])
+    print(alpha)
     if n:
         return np.array([np.sum([alpha[i,j] * pcn[j] for j in range(n)], axis=0) for i in range(len(d))])
     else:
