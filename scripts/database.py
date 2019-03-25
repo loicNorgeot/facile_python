@@ -242,26 +242,18 @@ if __name__ == "__main__":
             #group = [f for f in group]
             #print(group)
             for g in group:
-                #print(g)
-                #print(group)
-                newGroup = group[group!=g]
+                print(g)
+                print(group)
+                #newGroup = group[group!=g]
+                newGroup = [f for f in group if f != g]
                 print(newGroup)
                 TRAINING = os.path.join(directories["splitted"], newGroup)
                 IN = os.path.join(directories["splitted"], g)
                 OUT  = os.path.join(directories["splitted"], g.replace(".morphed.mesh", ".pca.mesh"))
-                lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
-
-        cases = set([(f.split(".")[0] + "." +f.split(".")[1]) for f in os.listdir(directories["splitted"]) if "morphed.mesh" in f])
-        #print(cases)
-        FILES = [[f for f in os.listdir(directories["splitted"]) if f.startswith(case) and "morphed.mesh" in f]for case in cases]
-        #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
-        FILES.sort(key = lambda x:x[0])
-        #print(FILES)
-
+                #lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
         TEST = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
         #print(TEST)
         pca(TEST)
-        #lib_exe.parallel(pca, TEST)
 
         # 7 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
         """
