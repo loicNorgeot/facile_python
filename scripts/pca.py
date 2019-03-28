@@ -28,7 +28,7 @@ def get_principal_components(v, d):
     return pc, pcn
 def reconstruct(pcn, d, n=None):
     alpha = np.array([[scalar(x,y) for y in pcn] for x in d])
-    print(alpha)
+    #print(alpha)
     if n:
         return np.array([np.sum([alpha[i,j] * pcn[j] for j in range(n)], axis=0) for i in range(len(d))])
     else:
@@ -46,9 +46,12 @@ if __name__ == "__main__":
     # Arguments
     parser = argparse.ArgumentParser(description="Runs a PCA")
     parser.add_argument("-t", "--training", help="training set", nargs="+", type=str, required=True)
+    #parser.add_argument("-t", "--training", help="training set", action='append', help='<Required> Set flag', type=str, required=True)
     parser.add_argument("-u", "--unknown",  help="unknown mesh to reconstruct", type=str, required=True)
     parser.add_argument("-o", "--output",   help="output file to write the reconstructed mesh", type=str, required=True)
     args = parser.parse_args()
+
+    print("WESH")
 
     # Transform the input dataset for PCA
     DATA = []
@@ -60,18 +63,21 @@ if __name__ == "__main__":
 
     #Run the PCA to reconstruct the unknown mesh
     unknown = msh.Mesh(args.unknown)
+    print(unknown.verts)
     X = PCA(DATA, unknown.verts[:,:3], n=5)
+    print(X)
 
     #Write it
     mesh=msh.Mesh()
     mesh.verts   = np.array([[x[0],x[1],x[2],0] for x in X])
-    mesh.scalars = np.array([ np.sqrt(np.sum([(x-y)**2 for x,y in zip(v1,v2)])) for v1,v2 in zip(unknown,X)])
+    mesh.scalars = np.array([ np.sqrt(np.sum([(x-y)**2 for x,y in zip(v1,v2)])) for v1,v2 in zip(unknown.verts[:,:3],X)])
     mesh.tris    = unknown.tris
     mesh.write(args.output)
     mesh.writeSol(args.output.replace(".mesh", ".sol"))
 
-    #Run a least square approcimation as a bonus
-    B = np.linalg.norm(unknown,axis=1)
+    """
+    #Run a least square approximation as a bonus
+    B = np.linalg.norm(unknown.verts[:,:3],axis=1)
     A = np.transpose(np.array([np.linalg.norm(D,axis=1) for D in DATA]))
     scalars = np.linalg.lstsq(A, B)
     coefs = np.array(scalars[0])
@@ -84,8 +90,9 @@ if __name__ == "__main__":
     #Create the final mesh from the least squares
     result = np.sum([ c * d for c,d in zip(coefs, DATA[inds]) ], axis=0) / n
     mesh=msh.Mesh()
-    mesh.verts   = np.array([[x[0],x[1],x[2],0] for x in results])
+    mesh.verts   = np.array([[x[0],x[1],x[2],0] for x in result])
     #mesh.scalars = np.array([ np.sqrt(np.sum([(x-y)**2 for x,y in zip(v1,v2)])) for v1,v2 in zip(unknown,proposed)])
     mesh.tris    = unknown.tris
     mesh.write(args.output.replace(".mesh", ".lstq.mesh"))
     mesh.writeSol(args.output.replace(".mesh", ".lstq.sol"))
+    """
