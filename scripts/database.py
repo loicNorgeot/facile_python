@@ -148,8 +148,9 @@ if __name__ == "__main__":
 	##### Reconstruction with the masseter reconstruc from pca #####
     if PCAMASS == True:
         dossier = "PcaMass"
-        """
+
         # 1 - Cut the masseters in half
+        """
         def split(group):
             for g in group:
                 mass = [g for g in group if "Mass" in g][0]
@@ -193,11 +194,15 @@ if __name__ == "__main__":
                     q.write("%f %f %f" % (centerMass[0], centerMass[1], centerMass[2]))
                     q.write("\n")
                     q.write("%f %f %f" % (centerR[0], centerR[1], centerR[2]))
+                    q.write("\n")
+                    q.write("%f" % (1))
                 q.close()
                 with open(tmp_fileL, "w") as k:
                     k.write("%f %f %f" % (centerMass[0], centerMass[1], centerMass[2]))
                     k.write("\n")
                     k.write("%f %f %f" % (centerL[0], centerL[1], centerL[2]))
+                    k.write("\n")
+                    k.write("%f" % (-1))
                 k.close()
             #Remove the temporary files
                 os.remove(TMP)
@@ -208,7 +213,8 @@ if __name__ == "__main__":
                 os.remove(TMP_L3)
                 os.remove(TMP_R3)
 
-        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass" in f])
+        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass.mesh" in f])
+        # attention si j'ai déja fait tourné le programme et qu'il y a des mass reconstruct dans "mesh" çà va merder !!!
         #print(cases)
         FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and "Mass" in f]for case in cases]
         #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
@@ -281,16 +287,21 @@ if __name__ == "__main__":
                 TRAINING = str()
                 for n in newGroup:
                     TRAINING = TRAINING + ' ' + os.path.join(directories["splitted"], n)
-                print(TRAINING)
+                #print(TRAINING)
                 IN = os.path.join(directories["splitted"], g)
                 OUT  = os.path.join(directories["splitted"], g.replace(".morphed.mesh", ".pca.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
         TEST = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
         #print(TEST)
-        pca(TEST)
+        if len(TEST)>0:
+            print('\033[95m' + "## EXECUTING 'PCA' on " + str(len(TEST)) + " cases " + '\033[0m')
+        else:
+            print('\033[95m' + "## SKIPPING 'PCA', no data found." + '\033[0m')
+            pass
+        pca(TEST) #Trouver un moyen de le lancer en parallèle sans "éclater les données de la listes d'entrée"
         """
         # 7 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
-
+        """
         def replace(group):
             # 1 - inverser l'alignement serait normalement la première étape
             for g in group:
@@ -310,40 +321,47 @@ if __name__ == "__main__":
                 TMP2 = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.2.mesh"))
                 S = (1/0.008)
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP, TMP2, S, S, S) )
-            # 4 - Translate into center of the old version of the same masseter
+            # 4 - Translate into center of the first version of L/R masseter
                 TMP3   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.3.mesh"))
-                OUT   = os.path.join(directories["splitted"], g.replace(".pca.mesh", ".reconstruct.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, TMP3, float(centerTruc.split()[0]), float(centerTruc.split()[1]), float(centerTruc.split()[2])))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP3, OUT, float(centerTruc.split()[3]), float(centerTruc.split()[4]), float(centerTruc.split()[5])))
+            # 5 - Symétrisation des L
+                TMP4   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.4.mesh"))
+                lib_exe.execute(lib_exe.blender_cmd("symetrie.py") + "-i %s -o %s -x %d" %  (TMP3, TMP4, float(centerTruc.split()[6])))
+            # 6 - Translate into center of the segmented masseter
+                OUT   = os.path.join(directories["splitted"], g.replace(".pca.mesh", ".reconstruct.mesh"))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP4, OUT, float(centerTruc.split()[3]), float(centerTruc.split()[4]), float(centerTruc.split()[5])))
             # Suppression des TEMPLATES
                 os.remove(TMP)
                 os.remove(TMP2)
                 os.remove(TMP3)
+                os.remove(TMP4)
         cases = set([f.split("-")[0] for f in os.listdir(directories["splitted"]) if ".pca.mesh" in f])
         #print(cases)
         FILES = [[f for f in os.listdir(directories["splitted"]) if f.startswith(case) and ".pca.mesh" in f and f.replace(".pca.mesh", ".recons.mesh") not in os.listdir(directories["splitted"])]for case in cases]
         FILES.sort(key = lambda x:x[0])
         #print(FILES)
         lib_exe.parallel(replace, FILES)
-
+        """
         # 8 - Merge the skull with the mass PCA reconstruct
+
         def merge(group):
             OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
             lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
         # Copy the masseters reconstructed from splitted to merged.
         for f in os.listdir(directories["splitted"]):
-            if ".pca.mesh" in f:
+            if ".reconstruct.mesh" in f:
                 copyfile(
                     os.path.join(directories["splitted"], f),
                     os.path.join(directories["mesh"], f)
                 )
-        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if ".pca.mesh" in f and f[0]!="."])
+        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass.mesh" in f and f[0]!="."])
+        #print(cases)
         GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass.mesh" not in f and "Skin" not in f] for case in cases] #"and "Mass" not in f" enleve le masseter du merge, si j'enlève cette partie il ajoute le masséter mais attention çà va tout refaire en erasant tout ce qui est fait.
-        print(GROUPS)
+        #print(GROUPS)
         GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
-        print(GROUPS)
+        #print(GROUPS)
         lib_exe.parallel(merge, GROUPS)
-
+        
     ### Back to the main script which get data ready for the reconstruction
     # 5 - Scale everything
     """
