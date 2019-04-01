@@ -131,14 +131,14 @@ for o in bpy.data.objects:
     if o!=mesh:
         bpy.data.objects.remove(o)
 
-#align the right side to the left
-if args.x == 1:
-    
-    mesh.select = True
-    bpy.ops.transform.resize(value=(-1, 1, 1))
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    bpy.ops.object.editmode_toggle()
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.editmode_toggle()
+# #align the right side to the left
+# if args.x == 1:
+#
+#     mesh.select = True
+#     bpy.ops.transform.resize(value=(-1, 1, 1))
+#     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+#     bpy.ops.object.editmode_toggle()
+#     bpy.ops.mesh.normals_make_consistent(inside=False)
+#     bpy.ops.object.editmode_toggle()
 
 export_mesh(args.output)
