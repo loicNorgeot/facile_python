@@ -55,9 +55,7 @@ def create_templates_and_directories(args):
         "signed",
         "masked",
         "morphed",
-        "splitted",
-        "muscles",
-        "reconstruction",
+        "masseter",
         "PcaMass",
         "RealMass",
         "SkullOnly"
@@ -75,7 +73,7 @@ if __name__ == "__main__":
     templates, directories = create_templates_and_directories(args)
 
     ################################################################################
-    # 1 - Create the database
+    ### Create the database
     ################################################################################
 
     # 1 - Download all the files from the FTP server
@@ -113,86 +111,159 @@ if __name__ == "__main__":
     lib_exe.parallel(check, GROUPS)
     """
 
-    # 4 - Choice of the type of reconstruction wanted
+    # 4 - Merge the bones (skull, mandibles and teeth) together
+    """
+    def mergeBones(group):
+        OUT   = os.path.join(directories["merged"], group[0][:6] + "Skull.mesh")
+        lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
+    cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if ".mesh" in f and f[0]!="."])
+    GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass" not in f and "Skin" not in f] for case in cases]
+    GROUPS = [f for f in GROUPS if f not in os.listdir(directories["merged"])]
+    lib_exe.parallel(mergeBones, GROUPS)
+    """
 
-    ##### Reconstruction with only the skull #####
+    # 5 - Scale everything
+    """
+    def scaleMain(group):
+        skull = [g for g in group if "Skull" in g][0]
+        centerskull = lib_msh.Mesh(os.path.join(directories["merged"], skull)).center
+        #la c'est le premier de la liste mais ca serait plus logique de le faire sur centre de chaque crane indépendament OU sur le centre du crane template éventuellement ...
+        for g in group:
+            IN    = os.path.join(directories["merged"], g)
+            TMP1  = os.path.join(directories["scaled"], "tmp1_%s" % g )
+        # Translate everything so that the center of the skull is on 0,0,0
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -centerskull[0], -centerskull[1], -centerskull[2]) )
+        # Scale by 0.0035
+            S = 0.0035
+            TMP2  = os.path.join(directories["scaled"], "tmp2_%s" % g )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, S, S, S) )
+        # Translate to 0.5 0.5 0.5
+            OUT  = os.path.join(directories["scaled"], g )
+            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
+            os.remove(TMP1)
+            os.remove(TMP2)
+
+    # Copy the Skin and Mass from mesh to merged.
+    for f in os.listdir(directories["mesh"]):
+        if f not in os.listdir(directories["merged"]):
+            if "Mass" in f or "Skin" in f:
+                copyfile(
+                    os.path.join(directories["mesh"], f),
+                    os.path.join(directories["merged"], f)
+                )
+    cases = set([f.split("-")[0] for f in os.listdir(directories["merged"])])
+    FILES = [[f for f in os.listdir(directories["merged"]) if f.startswith(case)] for case in cases]
+    FILES.sort(key = lambda x:x[0])
+    # Attention comme on ne stock pas le centerSkull si on veut ajouter des masseters il faut laisser les skull dans FILES
+    lib_exe.parallel(scaleMain, FILES)
+    """
+
+    # 6 - Remesh all the files
+    """
+    def remeshMain(f):
+        IN    = os.path.join(directories["scaled"], f)
+        HAUSD = 0.0025
+        if "Mass" in f:
+            HMIN = 0.001
+        else:
+            HMIN = 0.008
+        OUT   = os.path.join(directories["remeshed"], f)
+        lib_exe.execute(lib_exe.mmgs + "%s -nr -nreg -hausd %f -out %s -hmin %f > /dev/null 2>&1" % (IN, HAUSD, OUT, HMIN))
+    FILES = [f for f in os.listdir(directories["scaled"]) if ".mesh" in f]
+    FILES = [f for f in FILES if f not in os.listdir(directories["remeshed"])]
+    #print(FILES)
+    lib_exe.parallel(remeshMain, FILES)
+    """
+
+    # 7 - Choice of the type of reconstruction wanted
+
+    ##### 7.1 - Reconstruction with only the skull #####
     if SKULLONLY == True:
         dossier = "SkullOnly"
 
-        # Merge the bones (skull, mandibles and teeth) together
-        def merge(group):
-            OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
-            lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
-        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if ".mesh" in f and f[0]!="."])
-        GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass" not in f and "Skin" not in f] for case in cases] #"and "Mass" not in f" enleve le masseter du merge, si j'enlève cette partie il ajoute le masséter mais attention çà va tout refaire en erasant tout ce qui est fait.
-        print(GROUPS)
-        GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
-        print(GROUPS)
-        lib_exe.parallel(merge, GROUPS)
+        # Copy the merged skulls and the skins from remesh to SkullOnly.
+        for f in os.listdir(directories["remeshed"]):
+            if f not in os.listdir(directories[dossier]):
+                if "Skull.mesh" in f or "Skin.mesh" in f:
+                    copyfile(
+                        os.path.join(directories["remeshed"], f),
+                        os.path.join(directories[dossier], f.replace(".mesh", "-merged.mesh"))
+                    )
 
-    ##### Reconstruction with the real masseter #####
+
+    ##### 7.2 - Reconstruction with the real masseter #####
+    ### ATTENTION A REVOIIIIR ####
     if REALMASS == True:
         dossier = "RealMass"
 
-        # Merge the bones (skull, mandibles and teeth) together
-        def merge(group):
-            OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
-            lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
-        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if ".mesh" in f and f[0]!="."])
-        GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Skin" not in f] for case in cases] #"and "Mass" not in f" enleve le masseter du merge, si j'enlève cette partie il ajoute le masséter mais attention çà va tout refaire en erasant tout ce qui est fait.
-        print(GROUPS)
+        # Copy the merged skulls and the skins from remesh to RealMass.
+        for f in os.listdir(directories["remeshed"]):
+            if f in os.listdir(directories[dossier]):
+                if "Skull.mesh" in f or "Skin.mesh" in f or "Mass.mesh" in f:
+                    copyfile(
+                        os.path.join(directories["remeshed"], f),
+                        os.path.join(directories[dossier], f.replace(".mesh", "-merged.mesh"))
+                    )
+        # Merge the bones with the real masseter
+        def mergeMassReal(group):
+            OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull-merged.mesh")
+            lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories[dossier], g) for g in group]), OUT))
+            os.remove(os.path.join(directories[dossier], group[0][:6] + "Mass-merged.mesh"))
+        cases = set([f.split("-")[0] for f in os.listdir(directories[dossier]) if ".mesh" in f and f[0]!="."])
+        GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith(".mesh") and "Skin" not in f] for case in cases]
         GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
-        print(GROUPS)
-        lib_exe.parallel(merge, GROUPS)
+        lib_exe.parallel(mergeMassReal, GROUPS)
 
-	##### Reconstruction with the masseter reconstruc from pca #####
+
+
+	##### 7.3 - Reconstruction with the masseter reconstruc from pca #####
     if PCAMASS == True:
         dossier = "PcaMass"
 
-        # 1 - Cut the masseters in half
+        # 7.3.1 - Cut the masseters in half + symetry
 
         def split(group):
             for g in group:
                 mass = [g for g in group if "Mass" in g][0]
                 #print(mass)
                 # Translate everything so that the center of the mass is on 0,0,0
-                centerMass = lib_msh.Mesh(os.path.join(directories["mesh"], mass)).center
+                centerMass = lib_msh.Mesh(os.path.join(directories["remeshed"], mass)).center
                 #print(centerMass)
             # Scale to one unit and center
-                IN    = os.path.join(directories["mesh"], g)
-                TMP   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.mesh"))
+                IN    = os.path.join(directories["remeshed"], g)
+                TMP   = os.path.join(directories["masseter"], g.replace(".mesh", ".tmp.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP, -centerMass[0], -centerMass[1], -centerMass[2]))
             # Split in half
-                TMP_R = os.path.join(directories["splitted"], g.replace(".mesh", ".R.tmp.mesh"))
-                TMP_L = os.path.join(directories["splitted"], g.replace(".mesh", ".L.tmp.mesh"))
+                TMP_R = os.path.join(directories["masseter"], g.replace(".mesh", ".R.tmp.mesh"))
+                TMP_L = os.path.join(directories["masseter"], g.replace(".mesh", ".L.tmp.mesh"))
                 print(TMP_R)
                 lib_exe.execute(lib_exe.blender_cmd("split.py") + "-i %s -o %s -x %d" %  (TMP, TMP_R, 1))
                 lib_exe.execute(lib_exe.blender_cmd("split.py") + "-i %s -o %s -x %d" %  (TMP, TMP_L, -1))
             # Center tmpL et tmpR en zéro pour pouvoir faire le scalling et le move en 0 0 0
-                centerR = lib_msh.Mesh(os.path.join(directories["mesh"],TMP_R)).center
-                centerL = lib_msh.Mesh(os.path.join(directories["mesh"],TMP_L)).center
-                TMP_R2 = os.path.join(directories["splitted"], g.replace(".mesh", ".R.tmp2.mesh"))
-                TMP_L2 = os.path.join(directories["splitted"], g.replace(".mesh", ".L.tmp2.mesh"))
+                centerR = lib_msh.Mesh(os.path.join(directories["masseter"],TMP_R)).center
+                centerL = lib_msh.Mesh(os.path.join(directories["masseter"],TMP_L)).center
+                TMP_R2 = os.path.join(directories["masseter"], g.replace(".mesh", ".R.tmp2.mesh"))
+                TMP_L2 = os.path.join(directories["masseter"], g.replace(".mesh", ".L.tmp2.mesh"))
                 print(centerR)
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R, TMP_R2, -centerR[0], -centerR[1], -centerR[2]))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L, TMP_L2, -centerL[0], -centerL[1], -centerL[2]))
             # symetrie
-                TestSymR   = os.path.join(directories["splitted"], g.replace(".mesh", ".TestSymR.mesh"))
+                TestSymR   = os.path.join(directories["masseter"], g.replace(".mesh", ".TestSymR.mesh"))
                 lib_exe.execute(lib_exe.blender_cmd("symetrie.py") + "-i %s -o %s -x %d" %  (TMP_R2, TestSymR, 1))
             # Scale by 0.008
-                TMP_R3 = os.path.join(directories["splitted"], g.replace(".mesh", ".R.tmp3.mesh"))
-                TMP_L3 = os.path.join(directories["splitted"], g.replace(".mesh", ".L.tmp3.mesh"))
-                S = 0.008
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TestSymR, TMP_R3, S, S, S) )
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_L2, TMP_L3, S, S, S) )
+                # TMP_R3 = os.path.join(directories["masseter"], g.replace(".mesh", ".R.tmp3.mesh"))
+                # TMP_L3 = os.path.join(directories["masseter"], g.replace(".mesh", ".L.tmp3.mesh"))
+                # S = 0.008
+                # lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TestSymR, TMP_R3, S, S, S) )
+                # lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP_L2, TMP_L3, S, S, S) )
             # Move the halves to .5 .5 .5
-                OUT_R = os.path.join(directories["splitted"], g.replace(".mesh", ".R.raw.mesh"))
-                OUT_L = os.path.join(directories["splitted"], g.replace(".mesh", ".L.raw.mesh"))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_R3, OUT_R, .5, .5, .5))
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L3, OUT_L, .5, .5, .5))
+                OUT_R = os.path.join(directories["masseter"], g.replace(".mesh", ".R.raw.mesh"))
+                OUT_L = os.path.join(directories["masseter"], g.replace(".mesh", ".L.raw.mesh"))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TestSymR, OUT_R, .5, .5, .5))
+                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP_L2, OUT_L, .5, .5, .5))
             # Save center.txt
-                tmp_fileR = os.path.join(directories["splitted"], g.replace(".mesh", ".R.center.txt"))
-                tmp_fileL = os.path.join(directories["splitted"], g.replace(".mesh", ".L.center.txt"))
+                tmp_fileR = os.path.join(directories["masseter"], g.replace(".mesh", ".R.center.txt"))
+                tmp_fileL = os.path.join(directories["masseter"], g.replace(".mesh", ".L.center.txt"))
                 with open(tmp_fileR, "w") as q:
                     q.write("%f %f %f" % (centerMass[0], centerMass[1], centerMass[2]))
                     q.write("\n")
@@ -214,74 +285,74 @@ if __name__ == "__main__":
                 os.remove(TMP_L2)
                 os.remove(TMP_R2)
                 os.remove(TestSymR)
-                os.remove(TMP_L3)
-                os.remove(TMP_R3)
+                #os.remove(TMP_L3)
+                #os.remove(TMP_R3)
 
-        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass.mesh" in f])
+        cases = set([f.split("-")[0] for f in os.listdir(directories["remeshed"]) if "Mass.mesh" in f])
         # attention si j'ai déja fait tourné le programme et qu'il y a des mass reconstruct dans "mesh" çà va merder !!!
         #print(cases)
         #FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and "Mass" in f]for case in cases]
-        FILES = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and "Mass" in f and f.replace(".mesh", ".L.raw.mesh") not in os.listdir(directories["splitted"])]for case in cases]
-        #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["splitted"])]
+        FILES = [[f for f in os.listdir(directories["remeshed"]) if f.startswith(case) and f.endswith(".mesh") and "Mass" in f and f.replace(".mesh", ".L.raw.mesh") not in os.listdir(directories["masseter"])]for case in cases]
+        #FILES = [f for f in FILES if f.replace(".mesh", ".R.raw.mesh") not in os.listdir(directories["masseter"])]
         #FILES.sort(key = lambda x:x[0])
         print(FILES)
         lib_exe.parallel(split, FILES)
 
-        # 2 - Remesh everything
+        # 7.3.2 - Remesh everything
 
-        def remesh(f):
-            IN    = os.path.join(directories["splitted"], f)
-            HAUSD = 0.0025
-            HMIN = 0.001
-            OUT   = os.path.join(directories["splitted"], f.replace(".raw.mesh", ".remeshed.mesh"))
-            lib_exe.execute( lib_exe.mmgs + "%s -nr -nreg -hausd %f -hmin %f -out %s > /dev/null 2>&1" % (IN, HAUSD, HMIN, OUT))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".remeshed.mesh") not in os.listdir(directories["splitted"])]
-        print(FILES)
-        lib_exe.parallel(remesh, FILES)
+        # def remesh(f):
+        #     IN    = os.path.join(directories["masseter"], f)
+        #     HAUSD = 0.0025
+        #     HMIN = 0.001
+        #     OUT   = os.path.join(directories["masseter"], f.replace(".raw.mesh", ".remeshed.mesh"))
+        #     lib_exe.execute( lib_exe.mmgs + "%s -nr -nreg -hausd %f -hmin %f -out %s > /dev/null 2>&1" % (IN, HAUSD, HMIN, OUT))
+        # FILES = [f for f in os.listdir(directories["masseter"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".remeshed.mesh") not in os.listdir(directories["masseter"])]
+        # print(FILES)
+        # lib_exe.parallel(remesh, FILES)
 
-        # 3 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
+        # 7.3.3 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
         """
-        def align(f):
-            SOURCE = os.path.join(directories["splitted"], f)
+        def alignMass(f):
+            SOURCE = os.path.join(directories["masseter"], f)
             TARGET = templates["ellipsoide"]
-            MAT    = os.path.join(directories["splitted"], f[:13] + "icp_matrix.txt")
-            OUT    = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".aligned.mesh"))
+            MAT    = os.path.join(directories["masseter"], f[:13] + "icp_matrix.txt")
+            OUT    = os.path.join(directories["masseter"], f.replace(".remeshed.mesh", ".aligned.mesh"))
             lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (SOURCE, TARGET, MAT))
             lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".aligned.mesh") not in os.listdir(directories["splitted"])]
-        lib_exe.parallel(align, FILES)
+        FILES = [f for f in os.listdir(directories["masseter"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".aligned.mesh") not in os.listdir(directories["masseter"])]
+        lib_exe.parallel(alignMass, FILES)
         """
-        # 4 - Compute the signed distances on the masseter # REMPLACER remeshed par aligned si je veux intégrer l'alignement
+        # 7.3.4 - Compute the signed distances on the masseter # REMPLACER remeshed par aligned si je veux intégrer l'alignement
 
-        def signed(f):
-            IN  = os.path.join(directories["splitted"], f)
-            OUT = os.path.join(directories["splitted"], f.replace(".remeshed.mesh", ".signed.mesh"))
+        def signedMass(f):
+            IN  = os.path.join(directories["masseter"], f)
+            OUT = os.path.join(directories["masseter"], f.replace(".raw.mesh", ".signed.mesh"))
             BOX = templates["box"]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
                 lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".remeshed.mesh" in f and f.replace(".remeshed.mesh", ".signed.mesh") not in os.listdir(directories["splitted"])]
-        lib_exe.parallel(signed, FILES)
+        FILES = [f for f in os.listdir(directories["masseter"]) if ".raw.mesh" in f and f.replace(".raw.mesh", ".signed.mesh") not in os.listdir(directories["masseter"])]
+        lib_exe.parallel(signedMass, FILES)
         # for f in FILES:
         #     try:
         #         signed(f)
         #     except:
         #         print("%s failed..." % f)
 
-        # 5 - Morph the appropriate templates to the masseter
+        # 7.3.5 - Morph the appropriate templates to the masseter
 
-        def morph(f):
-            IN   = os.path.join(directories["splitted"], f)
-            OUT  = os.path.join(directories["splitted"], f.replace(".signed.mesh", ".morphed.mesh"))
+        def morphMass(f):
+            IN   = os.path.join(directories["masseter"], f)
+            OUT  = os.path.join(directories["masseter"], f.replace(".signed.mesh", ".morphed.mesh"))
             TMP  = templates["morphing_mass"]
             REFS = [10, 2, 0]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
-                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1800))
-        FILES = [f for f in os.listdir(directories["splitted"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["splitted"])]
-        lib_exe.parallel(morph, FILES)
+                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1900))
+        FILES = [f for f in os.listdir(directories["masseter"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["masseter"])]
+        lib_exe.parallel(morphMass, FILES)
 
-        # 6 - PCA des Masseters
+        # 7.3.6 - PCA des Masseters
 
         def pca(group):
             for g in group:
@@ -291,12 +362,12 @@ if __name__ == "__main__":
                 newGroup = [f for f in group if f != g]
                 TRAINING = str()
                 for n in newGroup:
-                    TRAINING = TRAINING + ' ' + os.path.join(directories["splitted"], n)
+                    TRAINING = TRAINING + ' ' + os.path.join(directories["masseter"], n)
                 #print(TRAINING)
-                IN = os.path.join(directories["splitted"], g)
-                OUT  = os.path.join(directories["splitted"], g.replace(".morphed.mesh", ".pca.mesh"))
+                IN = os.path.join(directories["masseter"], g)
+                OUT  = os.path.join(directories["masseter"], g.replace(".morphed.mesh", ".pca.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
-        TEST = [f for f in os.listdir(directories["splitted"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["splitted"])]
+        TEST = [f for f in os.listdir(directories["masseter"]) if ".morphed.mesh" in f and f.replace(".morphed.mesh", ".pca.mesh") not in os.listdir(directories["masseter"])]
         #print(TEST)
         if len(TEST)>0:
             print('\033[95m' + "## EXECUTING 'PCA' on " + str(len(TEST)) + " cases " + '\033[0m')
@@ -305,7 +376,7 @@ if __name__ == "__main__":
             pass
         pca(TEST) #Trouver un moyen de le lancer en parallèle sans "éclater les données de la listes d'entrée"
 
-        # 7 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
+        # 7.3.7 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
 
         def replace(group):
             # 1 - inverser l'alignement serait normalement la première étape
@@ -313,123 +384,72 @@ if __name__ == "__main__":
                 mass = [g for g in group if "Mass" in g][0]
                 #print(mass)
                 # Translate everything so that the center of the mass is on 0,0,0
-                centerNow = lib_msh.Mesh(os.path.join(directories["splitted"], mass)).center
+                centerNow = lib_msh.Mesh(os.path.join(directories["masseter"], mass)).center
                 tmp_file = str(g[:13])+"center.txt"
-                with open(os.path.join(directories["splitted"],tmp_file), "r") as q:
+                with open(os.path.join(directories["masseter"],tmp_file), "r") as q:
                     centerTruc = q.read()
                 #print(centerMass)
             # 2 - Translate in 0 0 0
-                IN    = os.path.join(directories["splitted"], g)
-                TMP   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.mesh"))
+                IN    = os.path.join(directories["masseter"], g)
+                TMP   = os.path.join(directories["masseter"], g.replace(".mesh", ".tmp.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP, -centerNow[0], -centerNow[1], -centerNow[2]))
             # 3 - Rescale
-                TMP2 = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.2.mesh"))
-                S = (1/0.008)
-                lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP, TMP2, S, S, S) )
+                # TMP2 = os.path.join(directories["masseter"], g.replace(".mesh", ".tmp.2.mesh"))
+                # S = (1/0.008)
+                # lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP, TMP2, S, S, S) )
             # 5 - Symétrisation des L
-                TMP3   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.3.mesh"))
-                lib_exe.execute(lib_exe.blender_cmd("symetrie.py") + "-i %s -o %s -x %d" %  (TMP2, TMP3, float(centerTruc.split()[6])))
+                TMP3   = os.path.join(directories["masseter"], g.replace(".mesh", ".tmp.3.mesh"))
+                lib_exe.execute(lib_exe.blender_cmd("symetrie.py") + "-i %s -o %s -x %d" %  (TMP, TMP3, float(centerTruc.split()[6])))
             # 4 - Translate into center of the first version of L/R masseter
-                TMP4   = os.path.join(directories["splitted"], g.replace(".mesh", ".tmp.4.mesh"))
+                TMP4   = os.path.join(directories["masseter"], g.replace(".mesh", ".tmp.4.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP3, TMP4, float(centerTruc.split()[0]), float(centerTruc.split()[1]), float(centerTruc.split()[2])))
             # 6 - Translate into center of the segmented masseter
-                OUT   = os.path.join(directories["splitted"], g.replace(".pca.mesh", ".reconstruct.mesh"))
+                OUT   = os.path.join(directories["masseter"], g.replace(".pca.mesh", ".reconstruct.mesh"))
                 lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP4, OUT, float(centerTruc.split()[3]), float(centerTruc.split()[4]), float(centerTruc.split()[5])))
             # Suppression des TEMPLATES
                 os.remove(TMP)
-                os.remove(TMP2)
+                #os.remove(TMP2)
                 os.remove(TMP3)
                 os.remove(TMP4)
-        cases = set([f.split("-")[0] for f in os.listdir(directories["splitted"]) if ".pca.mesh" in f])
+        cases = set([f.split("-")[0] for f in os.listdir(directories["masseter"]) if ".pca.mesh" in f])
         #print(cases)
-        FILES = [[f for f in os.listdir(directories["splitted"]) if f.startswith(case) and ".pca.mesh" in f and f.replace(".pca.mesh", ".reconstruct.mesh") not in os.listdir(directories["splitted"])]for case in cases]
+        FILES = [[f for f in os.listdir(directories["masseter"]) if f.startswith(case) and ".pca.mesh" in f and f.replace(".pca.mesh", ".reconstruct.mesh") not in os.listdir(directories["masseter"])]for case in cases]
         FILES.sort(key = lambda x:x[0])
         #print(FILES)
         lib_exe.parallel(replace, FILES)
 
-        # 8 - Merge the skull with the mass PCA reconstruct
 
+        # 7.3.8 - Merge the skull with the mass PCA reconstruct
+        """
         def merge(group):
             OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
             lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories["mesh"], g) for g in group]), OUT))
-        # Copy the masseters reconstructed from splitted to merged.
-        for f in os.listdir(directories["splitted"]):
-            if ".reconstruct.mesh" in f:
-                copyfile(
-                    os.path.join(directories["splitted"], f),
-                    os.path.join(directories["mesh"], f)
-                )
-        # # Copy the masseters reconstructed from splitted to merged.
-        # for case in cases:
-        #     for f in os.listdir(directories["mesh"]):
-        #         if f.startswith(case) and "Skull" in f or f.startswith(case) and "Skin" in f or f.startswith(case) and "Mand" in f or f.startswith(case) and "Teeth" in f:
-        #             copyfile(
-        #                 os.path.join(directories["mesh"], f),
-        #                 os.path.join(directories[dossier], f)
-        #             )
-
-        cases = set([f.split("-")[0] for f in os.listdir(directories["mesh"]) if "Mass.mesh" in f and f[0]!="."])
+        # Copy the masseters reconstructed from masseter to merged.
+        for f in os.listdir(directories["masseter"]):
+            if f not in os.listdir(directories[dossier]):
+                if ".reconstruct.mesh" in f:
+                    copyfile(
+                        os.path.join(directories["masseter"], f),
+                        os.path.join(directories[dossier], f)
+                    )
+        for f in os.listdir(directories["remeshed"]):
+            if f not in os.listdir(directories[dossier]):
+                if "Skull.mesh" in f or "Skin.mesh" in f:
+                    copyfile(
+                        os.path.join(directories["masseter"], f),
+                        os.path.join(directories[dossier], f)
+                    )
+        cases = set([f.split("-")[0] for f in os.listdir(directories[dossier]) if "Mass" in f and f[0]!="."])
         #print(cases)
-        GROUPS = [[f for f in os.listdir(directories["mesh"]) if f.startswith(case) and f.endswith(".mesh") and "Mass.mesh" not in f and "Skin" not in f] for case in cases] #"and "Mass" not in f" enleve le masseter du merge, si j'enlève cette partie il ajoute le masséter mais attention çà va tout refaire en erasant tout ce qui est fait.
+        GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith(".mesh") and "Skin" not in f] for case in cases] #"and "Mass" not in f" enleve le masseter du merge, si j'enlève cette partie il ajoute le masséter mais attention çà va tout refaire en erasant tout ce qui est fait.
         #print(GROUPS)
         GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
         #print(GROUPS)
         lib_exe.parallel(merge, GROUPS)
+        """
 
     ### Back to the main script which get data ready for the reconstruction
-    # 5 - Scale everything
-    """
-    def scale(group):
-        #Start here
-        skull = [g for g in group if "Skull" in g][0]
-        #la c'est le premier de la liste mais ca serait plus logique de le faire sur centre de chaque crane indépendament OU sur le centre du crane template éventuellement ...
-        # 1 - Translate everything so that the center of the skull is on 0,0,0
-        centerskull = lib_msh.Mesh(os.path.join(directories[dossier], skull)).center
-        for g in group:
-            IN    = os.path.join(directories[dossier], g)
-            TMP1  = os.path.join(directories[dossier], "tmp1_%s" % g )
-            # Translate everything so that the center of the skull is on 0,0,0
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (IN, TMP1, -centerskull[0], -centerskull[1], -centerskull[2]) )
-            # Scale by 0.0035
-            S = 0.0035
-            TMP2  = os.path.join(directories[dossier], "tmp2_%s" % g )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -s %f %f %f" % (TMP1, TMP2, S, S, S) )
-            # Translate to 0.5 0.5 0.5
-            OUT  = os.path.join(directories[dossier], g )
-            lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -t %f %f %f" % (TMP2, OUT, 0.5, 0.5, 0.5) )
-            os.remove(TMP1)
-            os.remove(TMP2)
-
-    # Copy the masseters and skins from mesh to merged.
-    for f in os.listdir(directories["mesh"]):
-        if "Mass" in f or "Skin" in f:
-            copyfile(
-                os.path.join(directories["mesh"], f),
-                os.path.join(directories[dossier], f)
-            )
-    #Get the skull files in "merged"
-    cases = set([f.split("-")[0] for f in os.listdir(directories[dossier])])
-    FILES = [[f for f in os.listdir(directories[dossier]) if f.startswith(case)] for case in cases]
-    FILES.sort(key = lambda x:x[0])
-    print(FILES)
-    #Execute
-    lib_exe.parallel(scale, FILES)
-    """
-
-    # 6 - Remesh all the files
-    """
-    def remesh(f):
-        IN    = os.path.join(directories[dossier], f)
-        HAUSD = 0.0025
-        OUT   = os.path.join(directories[dossier], f)
-        lib_exe.execute(lib_exe.mmgs + "%s -nr -nreg -hausd %f -out %s -hmin 0.008 > /dev/null 2>&1" % (IN, HAUSD, OUT))
-    FILES = [f for f in os.listdir(directories[dossier]) if ".mesh" in f]
-    FILES = [f for f in FILES if f not in os.listdir(directories[dossier])]
-    print(FILES)
-    lib_exe.parallel(remesh, FILES, 2)
-    """
-
-    # 7 - Align the models
+    # 8 - Align the models
     """
     def align(group):
         SOURCE = os.path.join(directories[dossier], [g for g in group if "Skull" in g][0])
@@ -438,19 +458,19 @@ if __name__ == "__main__":
         lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (SOURCE, TARGET, FILE))
         for g in group:
             IN  = os.path.join(directories[dossier], g)
-            OUT = os.path.join(directories[dossier], g)
+            OUT = os.path.join(directories[dossier], g.replace("merged.mesh", "align.mesh"))
             lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (IN, OUT, FILE))
             #S'assurer qu'on n'overwrite pas le fichier de la matrice
             #python3 transform.py -i merged/mandibule.mesh -o aligned/mandibule.mesh -m merged/icp_matrix.txt
     cases = set([f.split("-")[0] for f in os.listdir(directories[dossier])])
-    GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith(".mesh") and f not in os.listdir(directories["aligned"])] for case in cases]
+    GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith("merged.mesh") and f not in os.listdir(directories["aligned"])] for case in cases]
     GROUPS = [g for g in GROUPS if len(g)>0]
     for g in GROUPS:
         print(g)
     lib_exe.parallel(align, GROUPS)
     """
 
-    # 8 - OPTIONAL: generate a shell for warping from all the skulls we have
+    # 9 - OPTIONAL: generate a shell for warping from all the skulls we have
     # TOTALLY OPTIONNAL FOR NOW
     """
     mesh = lib_msh.Mesh()
@@ -461,31 +481,32 @@ if __name__ == "__main__":
     os.remove("merged.mesh")
     """
 
-    # 9 - Warp the bones
+    # 10 - Warp the bones
     """
     def warp(f):
         with tempfile.TemporaryDirectory() as tmp:
             os.chdir(tmp)
             IN  = os.path.join(directories[dossier], f)
-            OUT = os.path.join(directories[dossier], f)
+            OUT = os.path.join(directories[dossier], f.replace("align.mesh", "warp.mesh"))
             TEMPLATE = templates["sphere"]
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
-    FILES = [f for f in os.listdir(directories[dossier]) if "Skull.mesh" in f]
+    FILES = [f for f in os.listdir(directories[dossier]) if "Skull.align.mesh" in f]
     FILES = [f for f in FILES if f not in os.listdir(directories[dossier])]
     lib_exe.parallel(warp, FILES)
     """
 
-    # 10 - Compute the signed distances on the warped bones and skins
+    # 11 - Compute the signed distances on the warped bones and skins
+    # ATTENTION JE N'AI PAS HARMONISEE LA SUITE !!
     """
     def signed(f):
         IN  = os.path.join(directories[dossier], f) if "Skin" in f else os.path.join(directories[dossier], f)
-        OUT = os.path.join(directories[dossier], f)
+        OUT = os.path.join(directories[dossier], f.replace(".mesh", "d.mesh"))
         BOX = templates["box"]
         with tempfile.TemporaryDirectory() as tmp:
             os.chdir(tmp)
             lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
     FILES = []
-    warpedSkulls = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.endswith(".mesh")]
+    warpedSkulls = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.endswith("warp.mesh")]
     for skull in warpedSkulls:
         name = skull.split("-")[0]
         for face in os.listdir(directories[dossier]):
