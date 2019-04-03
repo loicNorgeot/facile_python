@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     #Warp
     #lib_exe.execute(lib_paths.wrapping + "-s %s -p -nit %d -load %f > /dev/null 2>&1" % (args.input, 30, 200) )
-    lib_exe.execute(lib_paths.wrapping + "-s %s -t %s -p -nit %d -load %f " % (args.input, args.template, 30, 250) )
+    lib_exe.execute(lib_paths.wrapping + "-s %s -t %s -p -nit %d -load %f " % (args.input, args.template, 40, 200) )
 
     #Clean the mesh and extract the surface
     final = None

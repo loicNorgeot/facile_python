@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = False
+REALMASS = True
 PCAMASS = False
-SKULLONLY = True
+SKULLONLY = False
 
 #arguments
 def get_arguments():
@@ -192,23 +192,23 @@ if __name__ == "__main__":
         dossier = "RealMass"
 
         # Copy the merged skulls and the skins from remesh to RealMass.
+        """
         for f in os.listdir(directories["remeshed"]):
-            if f in os.listdir(directories[dossier]):
+            if f not in os.listdir(directories[dossier]):
                 if "Skull.mesh" in f or "Skin.mesh" in f or "Mass.mesh" in f:
                     copyfile(
                         os.path.join(directories["remeshed"], f),
                         os.path.join(directories[dossier], f)
                     )
+        """
         # Merge the bones with the real masseter
         def mergeMassReal(group):
-            OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull-merged.mesh")
+            OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
             lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories[dossier], g) for g in group]), OUT))
-            os.remove(os.path.join(directories[dossier], group[0][:6] + "Mass-merged.mesh"))
-        cases = set([f.split("-")[0] for f in os.listdir(directories[dossier]) if ".mesh" in f and f[0]!="."])
-        GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith("Skin.mesh") or f.endswith("Skull.mesh") and "Skin" not in f] for case in cases]
-        GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
+            os.remove(os.path.join(directories[dossier], group[0][:6] + "Mass.mesh"))
+        cases = set([f.split("-")[0] for f in os.listdir(directories[dossier]) if "Mass" in f and f[0]!="."])
+        GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith(".mesh") and "Skin" not in f] for case in cases]
         lib_exe.parallel(mergeMassReal, GROUPS)
-
 
 
 	##### 7.3 - Reconstruction with the masseter reconstruc from pca #####
@@ -216,7 +216,7 @@ if __name__ == "__main__":
         dossier = "PcaMass"
 
         # 7.3.1 - Cut the masseters in half + symetry
-
+        """
         def split(group):
             for g in group:
                 mass = [g for g in group if "Mass" in g][0]
@@ -289,7 +289,7 @@ if __name__ == "__main__":
         #FILES.sort(key = lambda x:x[0])
         #print(FILES)
         lib_exe.parallel(split, FILES)
-
+        """
 
         # 7.3.2 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
         """
@@ -327,10 +327,10 @@ if __name__ == "__main__":
                 os.chdir(tmp)
                 lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1900))
         FILES = [f for f in os.listdir(directories["masseter"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["masseter"])]
-        lib_exe.parallel(morphMass, FILES)
+        lib_exe.parallel(morphMass, FILES, 10)
 
         # 7.3.5 - PCA des Masseters
-
+        """
         def pca(group):
             for g in group:
                 #print(g)
@@ -352,9 +352,9 @@ if __name__ == "__main__":
             print('\033[95m' + "## SKIPPING 'PCA', no data found." + '\033[0m')
             pass
         pca(TEST) #Trouver un moyen de le lancer en parallèle sans "éclater les données de la listes d'entrée"
-
+        """
         # 7.3.6 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
-
+        """
         def replace(group):
             # 1 - inverser l'alignement serait normalement la première étape
             for g in group:
@@ -394,7 +394,7 @@ if __name__ == "__main__":
         #FILES.sort(key = lambda x:x[0])
         #print(FILES)
         lib_exe.parallel(replace, FILES)
-
+        """
 
         # 7.3.7 - Merge the skull with the mass PCA reconstruct
 
@@ -407,7 +407,7 @@ if __name__ == "__main__":
                         os.path.join(directories["masseter"], f),
                         os.path.join(directories[dossier], f)
                     )
-        """
+
         for f in os.listdir(directories["remeshed"]):
             if f not in os.listdir(directories[dossier]):
                 if "Skull.mesh" in f or "Skin.mesh" in f:
@@ -424,11 +424,11 @@ if __name__ == "__main__":
         GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith(".mesh") and "Skin" not in f] for case in cases]
         GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
         lib_exe.parallel(mergePcaMass, GROUPS)
-
+        """
 
     ### Back to the main script which get data ready for the reconstruction
     # 8 - Align the models
-    
+
     def alignSkull(f):
         SOURCE = os.path.join(directories[dossier], f)
         TARGET = templates["skull"]
@@ -444,9 +444,8 @@ if __name__ == "__main__":
         lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull.mesh" in f and f.replace(".mesh", "-aligned.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin.mesh" in f and f.replace(".mesh", "-aligned.mesh") not in os.listdir(directories[dossier])]
-    print(SKIN)
-    lib_exe.parallel(alignSkull, FILES)
-    lib_exe.parallel(alignSkin, SKIN)
+    lib_exe.parallel(alignSkull, FILES, 11)
+    lib_exe.parallel(alignSkin, SKIN, 11)
 
 
     # 9 - OPTIONAL: generate a shell for warping from all the skulls we have
@@ -461,7 +460,7 @@ if __name__ == "__main__":
     """
 
     # 10 - Warp the bones
-    """
+
     def warp(f):
         with tempfile.TemporaryDirectory() as tmp:
             os.chdir(tmp)
@@ -471,8 +470,8 @@ if __name__ == "__main__":
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
     FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
-    lib_exe.parallel(warp, FILES)
-    """
+    lib_exe.parallel(warp, FILES, 1)
+
 
     # 11 - Compute the signed distances on the warped bones and skins
     # ATTENTION JE N'AI PAS HARMONISEE LA SUITE !!
