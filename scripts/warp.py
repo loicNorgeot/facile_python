@@ -25,7 +25,8 @@ if __name__ == "__main__":
     shutil.copyfile(args.template, "sphere.mesh")
 
     #Warp
-    lib_exe.execute(lib_paths.wrapping + "-s %s -p -nit %d -load %f > /dev/null 2>&1" % (args.input, 35, 250) )
+    #lib_exe.execute(lib_paths.wrapping + "-s %s -p -nit %d -load %f > /dev/null 2>&1" % (args.input, 30, 200) )
+    lib_exe.execute(lib_paths.wrapping + "-s %s -t %s -p -nit %d -load %f " % (args.input, args.template, 30, 250) )
 
     #Clean the mesh and extract the surface
     final = None
