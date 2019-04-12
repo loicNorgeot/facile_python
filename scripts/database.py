@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = False
+REALMASS = True
 PCAMASS = False
-SKULLONLY = True
+SKULLONLY = False
 
 #arguments
 def get_arguments():
@@ -461,77 +461,78 @@ if __name__ == "__main__":
 
     # 10 - Warp the bones
 
-    # def warp(f):
-    #     with tempfile.TemporaryDirectory() as tmp:
-    #         os.chdir(tmp)
-    #         IN  = os.path.join(directories[dossier], f)
-    #         OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-warped.mesh"))
-    #         TEMPLATE = templates["sphere"]
-    #         lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
-    # FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
-    # FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
-    # lib_exe.parallel(warp, FILES, 1)
-
-    def warp(files):
-        for f in files:
+    def warp(f):
+        with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
+            os.chdir(tmp)
             IN  = os.path.join(directories[dossier], f)
             OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-warped.mesh"))
             TEMPLATE = templates["sphere"]
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
-
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
     FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
-    if len(FILES)>0:
-        print('\033[95m' + "## EXECUTING 'Warping' on " + str(len(FILES)) + " cases " + '\033[0m')
-    else:
-        print('\033[95m' + "## SKIPPING 'Warping', no data found." + '\033[0m')
-        pass
-    warp(FILES)
+    lib_exe.parallel(warp, FILES)
 
+    # def warp(files):
+    #     for f in files:
+    #         IN  = os.path.join(directories[dossier], f)
+    #         OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-warped.mesh"))
+    #         TEMPLATE = templates["sphere"]
+    #         lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
+    #
+    # FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
+    # FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
+    # if len(FILES)>0:
+    #     print('\033[95m' + "## EXECUTING 'Warping' on " + str(len(FILES)) + " cases " + '\033[0m')
+    # else:
+    #     print('\033[95m' + "## SKIPPING 'Warping', no data found." + '\033[0m')
+    #     pass
+    # warp(FILES)
 
 
     # 11 - Compute the signed distances on the warped bones and skins
-    # ATTENTION JE N'AI PAS HARMONISEE LA SUITE !!
-    """
+
     def signedSkull(f):
         IN  = os.path.join(directories[dossier], f)
         OUT = os.path.join(directories[dossier], f.replace("-warped.mesh", "-signed.mesh"))
         BOX = templates["box"]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
             os.chdir(tmp)
             lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
     def signedSkin(f):
         IN  = os.path.join(directories[dossier], f)
         OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-signed.mesh"))
         BOX = templates["box"]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
             os.chdir(tmp)
             lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
 
     SKULL = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.replace("-warped.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin" in f and f.replace("-aligned.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
 
-    if len(SKULL)>0:
-        print('\033[95m' + "## EXECUTING 'signedSkull' on " + str(len(SKULL)) + " cases " + '\033[0m')
-    else:
-        print('\033[95m' + "## SKIPPING 'signedSkull', no data found." + '\033[0m')
-        pass
-    for f in SKULL:
-        try:
-            signedSkull(f)
-        except:
-            print("%s failed..." % f)
-    if len(SKIN)>0:
-        print('\033[95m' + "## EXECUTING 'signedSkin' on " + str(len(SKIN)) + " cases " + '\033[0m')
-    else:
-        print('\033[95m' + "## SKIPPING 'signedSkin', no data found." + '\033[0m')
-        pass
-    for f in SKIN:
-        try:
-            signedSkin(f)
-        except:
-            print("%s failed..." % f)
-    """
+    lib_exe.parallel(signedSkull, SKULL)
+    lib_exe.parallel(signedSkin, SKIN)
+
+    # if len(SKULL)>0:
+    #     print('\033[95m' + "## EXECUTING 'signedSkull' on " + str(len(SKULL)) + " cases " + '\033[0m')
+    # else:
+    #     print('\033[95m' + "## SKIPPING 'signedSkull', no data found." + '\033[0m')
+    #     pass
+    # for f in SKULL:
+    #     try:
+    #         signedSkull(f)
+    #     except:
+    #         print("%s failed..." % f)
+    # if len(SKIN)>0:
+    #     print('\033[95m' + "## EXECUTING 'signedSkin' on " + str(len(SKIN)) + " cases " + '\033[0m')
+    # else:
+    #     print('\033[95m' + "## SKIPPING 'signedSkin', no data found." + '\033[0m')
+    #     pass
+    # for f in SKIN:
+    #     try:
+    #         signedSkin(f)
+    #     except:
+    #         print("%s failed..." % f)
+
 
     #12 - ONLY FOR THE TEMPLATE ... Fill the wrapped surfaces with tetrahedra and an icosphere
     """
