@@ -34,14 +34,27 @@ if __name__ == "__main__":
     lib_exe.execute(cmd)
 
     #Clean the mesh
-    mesh = lib_msh.Mesh(args.signed[:-5] + ".1.mesh")
-    mesh.readSol(   args.signed[:-5] + ".1.depl.sol")
+    name = "signed.mesh"
+    for item in [x for x in os.listdir(".") if ".1.mesh" in x]:
+        finalM = item
+        print(finalM)
+    for item in [x for x in os.listdir(".") if ".1.depl.sol" in x]:
+        finalS = item
+    mesh = lib_msh.Mesh(finalM)
+    mesh.readSol(finalS)
     mesh.tets = np.array([])
     mesh.tris = mesh.tris[mesh.tris[:,-1]!=10]
     mesh.discardUnused()
     mesh.write(args.output)
     mesh.writeSol(args.output.replace("mesh", "sol"))
+    # mesh = lib_msh.Mesh(args.signed[:-5] + ".1.mesh")
+    # mesh.readSol( args.signed[:-5] + ".1.depl.sol")
+    # mesh.tets = np.array([])
+    # mesh.tris = mesh.tris[mesh.tris[:,-1]!=10]
+    # mesh.discardUnused()
+    # mesh.write(args.output)
+    # mesh.writeSol(args.output.replace("mesh", "sol"))
 
     #Remove the temporary files
-    os.remove(args.signed[:-5] + ".1.mesh")
-    os.remove(args.signed[:-5] + ".1.depl.sol")
+    # os.remove(args.signed[:-5] + ".1.mesh")
+    # os.remove(args.signed[:-5] + ".1.depl.sol")

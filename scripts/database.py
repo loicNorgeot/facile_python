@@ -37,7 +37,7 @@ def create_templates_and_directories(args):
     Looks in the directory associated with the templates, for a skull.mesh file for instance.
     If skull.mesh is found, then a variable templates["skull"] becomes available.
     """
-    templateNames = ["test2", "ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skull", "box"]
+    templateNames = ["test2", "ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skullOnly", "morphing_skullRM", "box"]
     templates     = {}
     for d in templateNames:
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
@@ -549,18 +549,20 @@ if __name__ == "__main__":
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f)
-        if SKULLONLY = True:
-            TMP  = templates["morphing_skull"] if "Skull" in f else templates["morphing_face"]
-        else if REALMASS = True:
+        NIT = 3
+        if SKULLONLY == True:
+            TMP  = templates["morphing_skullOnly"] if "Skull" in f else templates["morphing_face"]
+        elif REALMASS == True:
             TMP  = templates["morphing_skullRM"] if "Skull" in f else templates["morphing_face"]
         else:
             TMP  = templates["morphing_skullPCA"] if "Skull" in f else templates["morphing_face"]
         REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
             os.chdir(tmp)
-            lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 2000))
+            lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], NIT))
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
-    FILES = [f for f in FILES if f.replace("-signed.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
+    FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
+    print(FILES)
     lib_exe.parallel(morph, FILES)
     """
 
