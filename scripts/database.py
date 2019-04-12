@@ -154,28 +154,27 @@ if __name__ == "__main__":
     """
 
     # 6 - Remesh all the files
-    """
+
     def remeshMain(f):
         IN    = os.path.join(directories["scaled"], f)
         HAUSD = 0.0025
         if "Mass" in f:
-            HMIN = 0.001
+            HMIN = 0.00008
         else:
             HMIN = 0.008
         OUT   = os.path.join(directories["remeshed"], f)
         lib_exe.execute(lib_exe.mmgs + "%s -nr -nreg -hausd %f -out %s -hmin %f > /dev/null 2>&1" % (IN, HAUSD, OUT, HMIN))
     FILES = [f for f in os.listdir(directories["scaled"]) if ".mesh" in f]
     FILES = [f for f in FILES if f not in os.listdir(directories["remeshed"])]
-    #print(FILES)
     lib_exe.parallel(remeshMain, FILES)
-    """
+
 
     # 7 - Choice of the type of reconstruction wanted
 
     ##### 7.1 - Reconstruction with only the skull #####
     if SKULLONLY == True:
         dossier = "SkullOnly"
-
+        """ # Fonctionne pas ... il copie des trucs de je sais pas ou ...
         # Copy the merged skulls and the skins from remesh to SkullOnly.
         for f in os.listdir(directories["remeshed"]):
             if f not in os.listdir(directories[dossier]):
@@ -184,15 +183,15 @@ if __name__ == "__main__":
                         os.path.join(directories["remeshed"], f),
                         os.path.join(directories[dossier], f)
                     )
-
+        """
 
     ##### 7.2 - Reconstruction with the real masseter #####
     ### ATTENTION A REVOIIIIR ####
     if REALMASS == True:
         dossier = "RealMass"
 
-        # Copy the merged skulls and the skins from remesh to RealMass.
-        """
+        # Copy the merged skulls and the skins from remesh to RealMass (à adapter selon si le mass déjà merge ou si jamais de mass ou inclomplet).
+        """ # Fonctionne pas ... il copie des trucs de je sais pas ou ... meme erreur
         for f in os.listdir(directories["remeshed"]):
             if f not in os.listdir(directories[dossier]):
                 if "Skull.mesh" in f or "Skin.mesh" in f or "Mass.mesh" in f:
@@ -325,9 +324,10 @@ if __name__ == "__main__":
             REFS = [10, 2, 0]
             with tempfile.TemporaryDirectory() as tmp:
                 os.chdir(tmp)
-                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 1900))
+                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 2000))
         FILES = [f for f in os.listdir(directories["masseter"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["masseter"])]
-        lib_exe.parallel(morphMass, FILES, 10)
+        print(FILES)
+        lib_exe.parallel(morphMass, FILES)
 
         # 7.3.5 - PCA des Masseters
         """
@@ -444,8 +444,8 @@ if __name__ == "__main__":
         lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull.mesh" in f and f.replace(".mesh", "-aligned.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin.mesh" in f and f.replace(".mesh", "-aligned.mesh") not in os.listdir(directories[dossier])]
-    lib_exe.parallel(alignSkull, FILES, 11)
-    lib_exe.parallel(alignSkin, SKIN, 11)
+    lib_exe.parallel(alignSkull, FILES)
+    lib_exe.parallel(alignSkin, SKIN)
 
 
     # 9 - OPTIONAL: generate a shell for warping from all the skulls we have
@@ -461,41 +461,74 @@ if __name__ == "__main__":
 
     # 10 - Warp the bones
 
-    def warp(f):
-        with tempfile.TemporaryDirectory() as tmp:
-            os.chdir(tmp)
+    # def warp(f):
+    #     with tempfile.TemporaryDirectory() as tmp:
+    #         os.chdir(tmp)
+    #         IN  = os.path.join(directories[dossier], f)
+    #         OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-warped.mesh"))
+    #         TEMPLATE = templates["sphere"]
+    #         lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
+    # FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
+    # FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
+    # lib_exe.parallel(warp, FILES, 1)
+
+    def warp(files):
+        for f in files:
             IN  = os.path.join(directories[dossier], f)
             OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-warped.mesh"))
             TEMPLATE = templates["sphere"]
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
+
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
     FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
-    lib_exe.parallel(warp, FILES, 1)
+    if len(FILES)>0:
+        print('\033[95m' + "## EXECUTING 'Warping' on " + str(len(FILES)) + " cases " + '\033[0m')
+    else:
+        print('\033[95m' + "## SKIPPING 'Warping', no data found." + '\033[0m')
+        pass
+    warp(FILES)
+
 
 
     # 11 - Compute the signed distances on the warped bones and skins
     # ATTENTION JE N'AI PAS HARMONISEE LA SUITE !!
     """
-    def signed(f):
-        IN  = os.path.join(directories[dossier], f) if "Skin" in f else os.path.join(directories[dossier], f)
-        OUT = os.path.join(directories[dossier], f.replace(".mesh", "d.mesh"))
+    def signedSkull(f):
+        IN  = os.path.join(directories[dossier], f)
+        OUT = os.path.join(directories[dossier], f.replace("-warped.mesh", "-signed.mesh"))
         BOX = templates["box"]
         with tempfile.TemporaryDirectory() as tmp:
             os.chdir(tmp)
             lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
-    FILES = []
-    warpedSkulls = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.endswith("warp.mesh")]
-    for skull in warpedSkulls:
-        name = skull.split("-")[0]
-        for face in os.listdir(directories[dossier]):
-            if face.split("-")[0] == name and "Skin.mesh" in face:
-                FILES.append(skull)
-                FILES.append(face)
-    FILES = [f for f in FILES if f not in os.listdir(directories[dossier])]
-    #FILES = [f for f in FILES if "MADAN" not in f and "LAUVI" not in f]
-    for f in FILES:
+    def signedSkin(f):
+        IN  = os.path.join(directories[dossier], f)
+        OUT = os.path.join(directories[dossier], f.replace("-aligned.mesh", "-signed.mesh"))
+        BOX = templates["box"]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.chdir(tmp)
+            lib_exe.execute( lib_exe.python_cmd("signed.py") + "-i %s -o %s -v %s -p" % (IN, OUT, BOX))
+
+    SKULL = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.replace("-warped.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
+    SKIN = [f for f in os.listdir(directories[dossier]) if "Skin" in f and f.replace("-aligned.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
+
+    if len(SKULL)>0:
+        print('\033[95m' + "## EXECUTING 'signedSkull' on " + str(len(SKULL)) + " cases " + '\033[0m')
+    else:
+        print('\033[95m' + "## SKIPPING 'signedSkull', no data found." + '\033[0m')
+        pass
+    for f in SKULL:
         try:
-            signed(f)
+            signedSkull(f)
+        except:
+            print("%s failed..." % f)
+    if len(SKIN)>0:
+        print('\033[95m' + "## EXECUTING 'signedSkin' on " + str(len(SKIN)) + " cases " + '\033[0m')
+    else:
+        print('\033[95m' + "## SKIPPING 'signedSkin', no data found." + '\033[0m')
+        pass
+    for f in SKIN:
+        try:
+            signedSkin(f)
         except:
             print("%s failed..." % f)
     """
@@ -515,15 +548,21 @@ if __name__ == "__main__":
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f)
-        TMP  = templates["morphing_skull"] if "Skull" in f else templates["morphing_face"]
+        if SKULLONLY = True:
+            TMP  = templates["morphing_skull"] if "Skull" in f else templates["morphing_face"]
+        else if REALMASS = True:
+            TMP  = templates["morphing_skullRM"] if "Skull" in f else templates["morphing_face"]
+        else:
+            TMP  = templates["morphing_skullPCA"] if "Skull" in f else templates["morphing_face"]
         REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3]
         with tempfile.TemporaryDirectory() as tmp:
             os.chdir(tmp)
             lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 2000))
-    FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("mesh") ]
-    FILES = [f for f in FILES if f not in os.listdir(directories[dossier])]
+    FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
+    FILES = [f for f in FILES if f.replace("-signed.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
     lib_exe.parallel(morph, FILES)
     """
+
     # 14 - Generate "La Masqué"
     """
     def mask(group):

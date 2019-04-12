@@ -44,7 +44,7 @@ def signedDistance(f, box=None, parallel=False):
         adapt_box_to(f, box)
     else:
         create_box(f)
-    ncpus = 4 #mp.cpu_count() if parallel else 1
+    ncpus = 8 #mp.cpu_count() if parallel else 1
     lib_exe.execute( lib_exe.mshdist + "-ncpu " + str(ncpus) + " -noscale box.1.o.mesh " + f + " > /dev/null 2>&1")
     if os.path.exists("box.mesh"): os.remove("box.mesh")
     if os.path.exists("box.1.mesh"): os.remove("box.1.mesh")
