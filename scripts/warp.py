@@ -39,29 +39,29 @@ if __name__ == "__main__":
 
     #Warp
     NIT = 50
-    #lib_exe.execute(lib_paths.wrapping + "-s %s -p -nit %d -load %f > /dev/null 2>&1" % (args.input, 30, 200) )
-    lib_exe.execute(lib_paths.wrapping + "-s %s -t %s -p -nit %d -load %f " % (args.input, args.template, NIT, 180) )
+    #lib_exe.execute(lib_paths.wrapping + "-s %s -p -nit %d -load %f > /dev/null 2>&1" % (args.input, NIT, 200) )
+    lib_exe.execute(lib_paths.wrapping + "-s %s -t %s -p -nit %d -load %f " % (args.input, args.template, NIT, 200) )
 
     #Clean the mesh and extract the surface
+    chemin = args.template
     final = None
     try:
-        number_max=NIT+1
-        while final == None or intersects(final): #Attention boucle infini si le warping n'a pas fonctionné ...
-            number_max=number_max-1
-            for f in [x for x in os.listdir("./TEMPLATES") if "sphere.d." in x and ".mesh" in x]:
-                number = int(f.split(".")[2])
-                if number>number_max and not intersects(f):
-                    final = f
-    except:
-        number_max=NIT-5
+        number_max=NIT
         for f in [x for x in os.listdir("./TEMPLATES") if "sphere.d." in x and ".mesh" in x]:
             number = int(f.split(".")[2])
-            if number>number_max and not intersects(f):
-                final = f
+            if number>number_max:
+                final = chemin.replace("sphere.mesh", f)
+        if final!=None:
+            while intersects(final):
+                number_max=number_max-1
+                for f in [x for x in os.listdir("./TEMPLATES") if "sphere.d." in x and ".mesh" in x]:
+                    number = int(f.split(".")[2])
+                    if number==number_max:
+                        final = chemin.replace("sphere.mesh", f)
+    except:
+        final = "sphere.d.mesh"
 
-    chemin = args.template
-    newArg = chemin.replace("sphere.mesh", final)
-    warped = lib_msh.Mesh(newArg)
+    warped = lib_msh.Mesh(final)
     warped.tris = warped.tris[warped.tris[:,-1] != 2]
     warped.tets = np.array([])
     warped.discardUnused()
@@ -69,5 +69,9 @@ if __name__ == "__main__":
 
     #Remove the unused files
     for f in [x for x in os.listdir("./TEMPLATES") if "sphere.d." in x and ".mesh" in x]:
+        os.remove(chemin.replace("sphere.mesh", f))
+    for f in [x for x in os.listdir("./TEMPLATES") if "sphere.d." in x and ".node" in x]:
+        os.remove(chemin.replace("sphere.mesh", f))
+    for f in [x for x in os.listdir("./TEMPLATES") if "sphere.d." in x and ".face" in x]:
         os.remove(chemin.replace("sphere.mesh", f))
     #os.remove("sphere.d.mesh")
