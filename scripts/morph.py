@@ -10,6 +10,7 @@ if __name__ == "__main__":
 
     #arguments
     parser = argparse.ArgumentParser(description="Morphs a mesh to a signed distance volume")
+    parser.add_argument("-l", "--localisation",   type=str, help="directories temporay file", required=True)
     parser.add_argument("-t", "--template",   type=str, help="Template to morph", required=True)
     parser.add_argument("-o", "--output",     type=str, help="Output mesh", required=True)
     parser.add_argument("-s", "--signed",     type=str, help="Signed distance to morph to", required=True)
@@ -21,6 +22,7 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     #checks
+    args.localisation = os.path.abspath(args.localisation)
     args.template = os.path.abspath(args.template)
     args.signed   = os.path.abspath(args.signed)
     args.output   = os.path.abspath(args.output)
@@ -28,22 +30,30 @@ if __name__ == "__main__":
     # dref: Fixed surface inside the template (number + ref)
     # elref: Elements inside the fixed surface
     # bref: Follower elements
+    Asigned = args.signed
     shutil.copyfile(args.template, "template.mesh")
-    cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  " % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
+    shutil.copyfile(args.signed, "signed.mesh")
+    shutil.copyfile(Asigned.replace(".mesh",".sol"), "signed.sol")
+    cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  " % ("signed.mesh", "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
     #cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  > /dev/null 2>&1" % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
     lib_exe.execute(cmd)
 
+    finalM = None
+    finalS = None
     #Clean the mesh
     name = "signed.mesh"
-    for item in [x for x in os.listdir(".") if ".1.mesh" in x]:
+    for item in [x for x in os.listdir(args.localisation) if ".1.mesh" in x]:
         finalM = item
-        print(finalM)
-    for item in [x for x in os.listdir(".") if ".1.depl.sol" in x]:
+    for item in [x for x in os.listdir(args.localisation) if ".1.depl.sol" in x]:
         finalS = item
+
+    print(os.listdir(args.localisation))
+    print(finalM)
+
     mesh = lib_msh.Mesh(finalM)
     mesh.readSol(finalS)
     mesh.tets = np.array([])
-    mesh.tris = mesh.tris[mesh.tris[:,-1]!=10]
+    mesh.tris = mesh.tris[mesh.tris[:,-1] != 10]
     mesh.discardUnused()
     mesh.write(args.output)
     mesh.writeSol(args.output.replace("mesh", "sol"))
@@ -54,7 +64,7 @@ if __name__ == "__main__":
     # mesh.discardUnused()
     # mesh.write(args.output)
     # mesh.writeSol(args.output.replace("mesh", "sol"))
-
-    #Remove the temporary files
+    #
+    # #Remove the temporary files
     # os.remove(args.signed[:-5] + ".1.mesh")
     # os.remove(args.signed[:-5] + ".1.depl.sol")

@@ -37,7 +37,7 @@ def create_templates_and_directories(args):
     Looks in the directory associated with the templates, for a skull.mesh file for instance.
     If skull.mesh is found, then a variable templates["skull"] becomes available.
     """
-    templateNames = ["test2", "ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skullOnly", "morphing_skullRM", "box"]
+    templateNames = ["test2", "ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skullOnly", "morphing_skullRM", "morphing_skullPCA", "box"]
     templates     = {}
     for d in templateNames:
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
@@ -322,15 +322,16 @@ if __name__ == "__main__":
             OUT  = os.path.join(directories["masseter"], f.replace(".signed.mesh", ".morphed.mesh"))
             TMP  = templates["morphing_mass"]
             REFS = [10, 2, 0]
-            with tempfile.TemporaryDirectory() as tmp:
-                os.chdir(tmp)
-                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 2000))
+            with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmpo:
+                os.chdir(tmpo)
+                loc = os.path.abspath(tmpo)
+                lib_exe.execute( lib_exe.python_cmd("morph.py") + "-l %s -t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (loc, TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 2000))
         FILES = [f for f in os.listdir(directories["masseter"]) if ".signed.mesh" in f and f.replace(".signed.mesh", ".morphed.mesh") not in os.listdir(directories["masseter"])]
-        print(FILES)
+        #print(FILES)
         lib_exe.parallel(morphMass, FILES)
 
         # 7.3.5 - PCA des Masseters
-        """
+
         def pca(group):
             for g in group:
                 #print(g)
@@ -352,9 +353,9 @@ if __name__ == "__main__":
             print('\033[95m' + "## SKIPPING 'PCA', no data found." + '\033[0m')
             pass
         pca(TEST) #Trouver un moyen de le lancer en parallèle sans "éclater les données de la listes d'entrée"
-        """
+
         # 7.3.6 - Replacer les masseters dans le bon repère (sans la version "align" avec matrice 4x4)
-        """
+
         def replace(group):
             # 1 - inverser l'alignement serait normalement la première étape
             for g in group:
@@ -394,7 +395,7 @@ if __name__ == "__main__":
         #FILES.sort(key = lambda x:x[0])
         #print(FILES)
         lib_exe.parallel(replace, FILES)
-        """
+
 
         # 7.3.7 - Merge the skull with the mass PCA reconstruct
 
@@ -415,6 +416,7 @@ if __name__ == "__main__":
                         os.path.join(directories["remeshed"], f),
                         os.path.join(directories[dossier], f)
                     )
+        """
         def mergePcaMass(group):
             OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
             lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories[dossier], g) for g in group]), OUT))
@@ -424,7 +426,7 @@ if __name__ == "__main__":
         GROUPS = [[f for f in os.listdir(directories[dossier]) if f.startswith(case) and f.endswith(".mesh") and "Skin" not in f] for case in cases]
         GROUPS = [f for f in GROUPS if f not in os.listdir(directories[dossier])]
         lib_exe.parallel(mergePcaMass, GROUPS)
-        """
+
 
     ### Back to the main script which get data ready for the reconstruction
     # 8 - Align the models
@@ -509,8 +511,8 @@ if __name__ == "__main__":
     SKULL = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.replace("-warped.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin" in f and f.replace("-aligned.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
 
-    lib_exe.parallel(signedSkull, SKULL)
-    lib_exe.parallel(signedSkin, SKIN)
+    lib_exe.parallel(signedSkull, SKULL,3)
+    lib_exe.parallel(signedSkin, SKIN, 3)
 
     # if len(SKULL)>0:
     #     print('\033[95m' + "## EXECUTING 'signedSkull' on " + str(len(SKULL)) + " cases " + '\033[0m')
@@ -538,33 +540,43 @@ if __name__ == "__main__":
     """
     def fill(f):
         IN  = os.path.join(directories[dossier], f)
-        OUT = os.path.join(directories[dossier], f)
+        OUT = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
         lib_exe.execute( lib_exe.python_cmd("fill.py") + "-i %s -o %s -c 0.5 0.5 0.5 -r 0.05" % (IN, OUT))
     FILES = [f for f in os.listdir(directories[dossier]) if "test2" in f]
     lib_exe.parallel(fill, FILES)
     """
 
     # 13 - Morph the appropriate templates to the skull
-    """
+
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
-        OUT  = os.path.join(directories[dossier], f)
-        NIT = 3
+        OUT  = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
+        NIT = 25
         if SKULLONLY == True:
-            TMP  = templates["morphing_skullOnly"] if "Skull" in f else templates["morphing_face"]
+            if "Skull" in f:
+                TMP  = templates["morphing_skullOnly"]
+            else:
+                TMP  = templates["morphing_face"]
         elif REALMASS == True:
-            TMP  = templates["morphing_skullRM"] if "Skull" in f else templates["morphing_face"]
+            if "Skull" in f:
+                TMP  = templates["morphing_skullRM"]
+            else:
+                TMP  = templates["morphing_face"]
         else:
-            TMP  = templates["morphing_skullPCA"] if "Skull" in f else templates["morphing_face"]
+            if "Skull" in f:
+                TMP  = templates["morphing_skullPCA"]
+            else:
+                TMP  = templates["morphing_face"]
         REFS = [10, 2, 0] if "Skull" in f else [10, 2, 3]
-        with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
-            os.chdir(tmp)
-            lib_exe.execute( lib_exe.python_cmd("morph.py") + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (TMP, IN, OUT, REFS[0], REFS[1], REFS[2], NIT))
+        with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmpo:
+            os.chdir(tmpo)
+            loc = os.path.abspath(tmpo)
+            lib_exe.execute( lib_exe.python_cmd("morph.py") + "-l %s -t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (loc, TMP, IN, OUT, REFS[0], REFS[1], REFS[2], NIT))
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES)
-    """
+    lib_exe.parallel(morph, FILES, 4)
+
 
     # 14 - Generate "La Masqué"
     """
