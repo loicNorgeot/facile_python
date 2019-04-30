@@ -40,9 +40,9 @@ if __name__=="__main__":
         sys.exit()
 
     mesh = lib_msh.Mesh(args.input)
-    ico  = lib_msh.Mesh(ico=[args.center,args.radius])
-    ico.tris[:,-1]=10
-    mesh.fondre(ico)
+    #ico  = lib_msh.Mesh(ico=[args.center,args.radius])
+    #ico.tris[:,-1]=10
+    #mesh.fondre(ico)
     mesh.write("out.mesh")
     lib_exe.execute(lib_exe.tetgen + "-pgANEYF out.mesh")
     lib_exe.execute(lib_exe.mmg3d + "out.1.mesh -nosurf -o " + args.output)

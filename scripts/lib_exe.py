@@ -52,7 +52,7 @@ def debug():
 
     return true_decorator
 
-def parallel(func, items, ncpus = 7): #ncpus=128):
+def parallel(func, items, ncpus = 4): #ncpus=128):
     if len(items)>0:
         num = min( ncpus, min(len(items), mp.cpu_count()-1 ))
         print('\033[95m' + "## EXECUTING '" + func.__name__ + "' on " + str(len(items)) + " cases and " + str(num) + " process(es)." + '\033[0m')
@@ -64,12 +64,12 @@ def parallel(func, items, ncpus = 7): #ncpus=128):
 
 def execute(cmd, msg="erreur"):
     try:
-        print("Running '" + cmd + "'")
+        print('\033[32m' + "Running" + '\033[0m' + " '" + cmd + "'")
         process  = sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
         out, err = [x.strip() for x in process.communicate()]
         code     = process.returncode
         if code:
-            print('\033[31m' + "Error " + '\033[0m' + "running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
+            print('\033[31m' + "Error " + '\033[0m' + "Running '" + cmd + "'\n" + "OUTPUT:\n" + str(out) + "ERROR:\n" + str(err))
             # j'ai tenté de mettre de la ciouleur sur le mot erreur si bug supprimer les deux éléments encadrant "Error"
             #raise Exception(msg)
     except:

@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = True
+REALMASS = False
 PCAMASS = False
-SKULLONLY = False
+SKULLONLY = True
 
 #arguments
 def get_arguments():
@@ -551,7 +551,7 @@ if __name__ == "__main__":
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
-        NIT = 25
+        NIT = 2000
         if SKULLONLY == True:
             if "Skull" in f:
                 TMP  = templates["morphing_skullOnly"]
@@ -575,7 +575,7 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES, 4)
+    lib_exe.parallel(morph, FILES)
 
 
     # 14 - Generate "La Masqué"
@@ -583,15 +583,21 @@ if __name__ == "__main__":
     def mask(group):
         INTERIOR  = [ os.path.join(directories[dossier], g) for g in group if "Skull" in g][0]
         EXTERIOR  = [ os.path.join(directories[dossier], g) for g in group if "Skin" in g][0]
-        MASK      = os.path.join(directories[dossier], group[0].split("-")[0] + "_la_masque.mesh")
-        TEMPLATE  = templates["morphing_skull"]
+        MASK      = os.path.join(directories[dossier], group[0].split("-")[0] + "-la_masque.mesh")
+        if SKULLONLY == True:
+            TEMPLATE  = templates["morphing_skullOnly"]
+        elif REALMASS == True:
+            TEMPLATE  = templates["morphing_skullRM"]
+        else:
+            TEMPLATE  = templates["morphing_skullPCA"]
         lib_exe.execute( lib_exe.python_cmd("mask.py") + "-i %s -e %s -o %s -t %s" % (INTERIOR, EXTERIOR, MASK, TEMPLATE))
 
     cases = set([f.split("-")[0] for f in os.listdir(directories[dossier]) if ".mesh" in f])
-    GROUPS = [ [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and case in f] for case in cases]
+    print (cases)
+    GROUPS = [ [f for f in os.listdir(directories[dossier]) if ("Skull-morphed.mesh" in f or "Skin-morphed.mesh" in f) and case in f and f.replace("-morphed.mesh", "_la_masque.mesh") not in os.listdir(directories[dossier]) ] for case in cases]
     print(GROUPS)
     GROUPS = [g for g in GROUPS if len(g)==2]
-    GROUPS = [g for g in GROUPS if g not in os.listdir(directories[dossier])]
-    #print(GROUPS)
+    #GROUPS = [g for g in GROUPS if g not in os.listdir(directories[dossier])]
+    print(GROUPS)
     lib_exe.parallel(mask, GROUPS, 1) #ne fonctionne pas sur plus d'un processeur à la fois ... ?
     """
