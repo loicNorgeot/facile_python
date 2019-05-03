@@ -17,8 +17,8 @@ import tempfile
 from lib_paths import *
 
 REALMASS = False
-PCAMASS = False
-SKULLONLY = True
+PCAMASS = True
+SKULLONLY = False
 
 #arguments
 def get_arguments():
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         dossier = "PcaMass"
 
         # 7.3.1 - Cut the masseters in half + symetry
-        """
+
         def split(group):
             for g in group:
                 mass = [g for g in group if "Mass" in g][0]
@@ -288,7 +288,7 @@ if __name__ == "__main__":
         #FILES.sort(key = lambda x:x[0])
         #print(FILES)
         lib_exe.parallel(split, FILES)
-        """
+
 
         # 7.3.2 - Align the masseters : Je le laisse de côté pour le moment parce que çà n'apport pas vraiment de différence pour la PCA et que çà me fait une manpeurvre supplémentaire inutile à sauvegarder dans un prmier temps
         """
@@ -322,7 +322,7 @@ if __name__ == "__main__":
             OUT  = os.path.join(directories["masseter"], f.replace(".signed.mesh", ".morphed.mesh"))
             TMP  = templates["morphing_mass"]
             REFS = [10, 2, 0]
-            with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmpo:
+            with tempfile.TemporaryDirectory(dir = os.path.join(directories["masseter"])) as tmpo:
                 os.chdir(tmpo)
                 loc = os.path.abspath(tmpo)
                 lib_exe.execute( lib_exe.python_cmd("morph.py") + "-l %s -t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d" % (loc, TMP, IN, OUT, REFS[0], REFS[1], REFS[2], 2000))
@@ -400,23 +400,27 @@ if __name__ == "__main__":
         # 7.3.7 - Merge the skull with the mass PCA reconstruct
 
         # Copy the masseters reconstructed from masseter to merged.
-        """
-        for f in os.listdir(directories["masseter"]):
-            if f not in os.listdir(directories[dossier]):
-                if ".reconstruct.mesh" in f:
-                    copyfile(
+        # Liste des fichiers dont je veux faire la reconstruction
+        cases = {'LAUVI', 'PLAHE', 'CORME', 'TRARO', 'BELNA', 'KLEBA', 'MACFR', 'HAMJE', 'CORLA', 'JORKA', 'MANMA', 'LARGA', 'CORCH', 'HENCL', 'TOTSY', 'HASSA', 'FLOST', 'GROJU', 'GEYMA', 'ABDKA', 'HAHSA', 'GARTI', 'GORLU', 'PREVI', 'DUMEL', 'KESSA', 'BUIFR', 'FAYCA', 'FAVAM', 'GRILA', 'CHACL', 'ITHAU', 'AGBAR', 'ADASA', 'DEAEL', 'LUBCH', 'GROAU'}
+        for case in cases:
+            for f in os.listdir(directories["masseter"]):
+                if f.startswith(case) and ".reconstruct.mesh" in f:
+                    name = case + '-Skull.mesh'
+                    if name not in os.listdir(directories[dossier]):
+                        copyfile(
                         os.path.join(directories["masseter"], f),
                         os.path.join(directories[dossier], f)
-                    )
+                        )
 
-        for f in os.listdir(directories["remeshed"]):
-            if f not in os.listdir(directories[dossier]):
-                if "Skull.mesh" in f or "Skin.mesh" in f:
-                    copyfile(
-                        os.path.join(directories["remeshed"], f),
-                        os.path.join(directories[dossier], f)
-                    )
-        """
+        for case in cases:
+            for f in os.listdir(directories["remeshed"]):
+                if f not in os.listdir(directories[dossier]):
+                    if f.startswith(case) and "Skull.mesh" in f or f.startswith(case) and "Skin.mesh" in f:
+                        copyfile(
+                            os.path.join(directories["remeshed"], f),
+                            os.path.join(directories[dossier], f)
+                        )
+
         def mergePcaMass(group):
             OUT   = os.path.join(directories[dossier], group[0][:6] + "Skull.mesh")
             lib_exe.execute( lib_exe.python_cmd("merge.py") + "-i %s -o %s" % (" ".join([os.path.join(directories[dossier], g) for g in group]), OUT))

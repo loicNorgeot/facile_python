@@ -51,8 +51,6 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output",   help="output file to write the reconstructed mesh", type=str, required=True)
     args = parser.parse_args()
 
-    print("WESH")
-
     # Transform the input dataset for PCA
     DATA = []
     for f in args.training:
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     #Run the PCA to reconstruct the unknown mesh
     unknown = msh.Mesh(args.unknown)
     print(unknown.verts)
-    X = PCA(DATA, unknown.verts[:,:3], n=10)
+    X = PCA(DATA, unknown.verts[:,:3], n=5)
     print(X)
 
     #Write it
