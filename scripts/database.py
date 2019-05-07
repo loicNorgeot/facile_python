@@ -466,7 +466,7 @@ if __name__ == "__main__":
     """
 
     # 10 - Warp the bones
-
+    """
     def warp(f):
         with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
             os.chdir(tmp)
@@ -477,7 +477,7 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
     FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
     lib_exe.parallel(warp, FILES)
-
+    """
     # def warp(files):
     #     for f in files:
     #         IN  = os.path.join(directories[dossier], f)
@@ -579,7 +579,7 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES)
+    lib_exe.parallel(morph, FILES, 10)
 
 
     # 14 - Generate "La Masqué"

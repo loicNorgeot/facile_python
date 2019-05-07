@@ -31,17 +31,23 @@ import tempfile
 import shutil
 
 from lib_paths import *
-import lib_msh
+
 
 def init():
     #Argument parsing
     parser = argparse.ArgumentParser(description="Reconstruction of one skull")
     parser.add_argument("-t", "--templates", type=str, help="directory for the templates", required=True)
     parser.add_argument("-m", "--morphed", type=str, help="directory where the morphed results have been created", required=True)
-    parser.add_argument("-i", "--input",     type=str, help=".mesh file(s) to be reconstructed", nargs="+", required=True)
+    #parser.add_argument("-i", "--input",     type=str, help=".mesh file(s) to be reconstructed", nargs="+", required=True)
+    parser.add_argument("-i", "--input",     type=str, help=".mesh file(s) to be reconstructed", required=True)
     args = parser.parse_args()
     args.templates = os.path.abspath(args.templates)
-    args.input = [os.path.abspath(n) for n in args.input]
+    args.morphed = os.path.abspath(args.morphed)
+    args.input = os.path.abspath(args.input)
+
+
+    #args.input = [os.path.abspath(n) for n in args.input]
+    #print(args.input)
 
     #Template files
     templateNames = ["masseter", "mandible", "skull", "sphere", "morphing_face", "morphing_skull", "box"]
@@ -51,12 +57,14 @@ def init():
 
     return args, templates
 
-
 if __name__ == "__main__":
 
     #Get the templates and arguments
     args, templates = init()
     NAME = "reconstruction"
+    ipt = args.input.split("/")[-1]
+    print(ipt)
+
     """
     # 1 - If needed, convert the .obj or .stl objects to .mesh
     for i,f in enumerate(args.input):
@@ -86,29 +94,101 @@ if __name__ == "__main__":
     # 5 - Align
     lib_exe.execute( lib_exe.python_cmd("icp.py") + "-s %s -t %s -m %s" % (NAME + ".remeshed.mesh", templates["skull"], NAME + ".matrix.txt"))
     lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (NAME + ".remeshed.mesh", NAME + ".aligned.mesh", NAME + ".matrix.txt"))
-    
-    
+
+
     # 6 - Warp
     lib_exe.execute( lib_exe.python_cmd("warp.py")
         + "-i %s -o %s -t %s"
         % (NAME + ".aligned.mesh", NAME + ".warped.mesh", templates["sphere"])
     )
 
-    
+
     # 7 - Signed distance
     lib_exe.execute( lib_exe.python_cmd("signed.py")
         + "-i %s -o %s -v %s -p"
         % (NAME + ".warped.mesh", NAME + ".signed.mesh", templates["box"])
     )
 
-    
+
     # 8 - Morph the template to this warped skull
     lib_exe.execute( lib_exe.python_cmd("morph.py")
         + "-t %s -s %s -o %s --icotris %d --icotets %d --fixtris %d -n %d"
         % (templates["morphing_skull"], NAME + ".signed.mesh", NAME + ".morphed.mesh", 10, 2, 0, 1500)
     )
-    
+    """
     # 9 - Find the closest of all the skulls that was warped before
+    def scalar(d1,d2):
+        return np.sum(np.multiply(d1,d2)) / (np.linalg.norm(d1)*np.linalg.norm(d2))
+    def cov(d):
+        return np.array([[scalar(x,y) for x in d] for y in d])
+
+    DATA = []
+    mesh = lib_msh.Mesh(args.input)
+    DATA.append(mesh.verts[:,:3])
+    FILES = [f for f in os.listdir(args.morphed)]
+    print(FILES)
+    for f in FILES:
+        if f!= ipt:
+            mesh = lib_msh.Mesh(os.path.join(args.morphed, f))
+            DATA.append(mesh.verts[:,:3])
+    DATA = np.array(DATA)
+
+    A = cov(DATA)
+    print("/n Matrice A VarCoVar /n",A)
+
+    B= []
+    for i in range(len(A[0])):
+        if A[i,0] < 0.99999999 and A[i,0] not in B:
+            B.append(A[i,0])
+    max = np.amax(B)
+    res = np.where(A == max)
+    print("/n Valeur max de B /n", max)
+    print("/n Localisation de la valeur max de A /n", res)
+    liste = list(zip(res[0], res[1]))
+    print(liste[0][1])
+    case = []
+    num = []
+    case.append(FILES[liste[0][1]].split("-")[0])
+    num.append(liste[0][1])
+    B= []
+    for i in range(len(A[0])):
+        if A[i,liste[0][1]] < 0.99999999 and A[i,liste[0][1]] not in B:
+            B.append(A[i,liste[0][1]])
+    min1 = np.amin(B)
+    res = np.where(A == min1)
+    print("/n Valeur min de B /n", min1)
+    print("/n Localisation de la valeur min de B/n", res)
+    liste1 = list(zip(res[0], res[1]))
+    print(liste1[0][1])
+    case.append(FILES[liste1[0][1]].split("-")[0])
+    num.append(liste1[0][1])
+    B= []
+    for i in range(len(A[0])):
+        if A[i,liste[0][1]] < 0.99999999 and A[i,liste1[0][1]] < 0.99999999:
+            B.append((A[i,liste[0][1]] + A[i,liste1[0][1]])/2)
+        else:
+            B.append(1.0)
+    min2 = np.amin(B)
+    res = np.where(B == min2)
+
+    print("/n Valeur min de B /n", min2)
+    print("/n Localisation de la valeur min de B/n", res)
+    liste2 = list(zip(res[0]))
+    print(liste2[0][0])
+    case.append(FILES[liste2[0][0]].split("-")[0])
+    num.append(liste2[0][0])
+    print(case)
+    print(num)
+
+
+    alpha = np.array([scalar(DATA[0],y) for y in DATA[num]])
+    print(alpha)
+
+    sys.exit()
+
+
+
+    """
     def distance(a,b):
         return ( (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2 ) **0.5
     mesh = lib_msh.Mesh(NAME + ".morphed.mesh")
@@ -127,34 +207,23 @@ if __name__ == "__main__":
     case = MORPHED[MEANS[np.argmin([mean[1] for mean in MEANS])][0]].split("-")[0]
     print(case)
     """
-	
-    """
-    Du coup on la fait avant
-    # 10 - Create a mask with the morphed skull and face of the closest match, and add the vector field.
-    #case  = "BENCA"
-    skull = os.path.join(args.morphed, "%s-Skull.mesh" % case)
-    skin  = os.path.join(args.morphed, "%s-Skin.mesh"  % case)
-    lib_exe.execute( lib_exe.python_cmd("mask.py")
-        + "-i %s -e %s -o %s -t %s"
-        % ( skull, skin, NAME + ".lamasque.mesh", NAME + ".morphed.mesh")
-    )
-    """
-    
+
+
     #JUSTE CAR JE N4AI PAS TOUS LES MASQUES J4EN CHOISI UN AUTRE ASSEZ "PROCHE"
-    case = "ADASA"
+    #case = "ADASA"
 
     #Create the elasticity file
     with open(NAME + "_la_masque.elas", "w") as f:
         f.write("Dirichlet\n1\n1 vertex f\n\n")
         f.write("Lame\n1\n2 186000. 3400.\n\n")
-    
+
     # 11 - Run the elasticity with the given input = last step
     lib_exe.execute( lib_exe.elasticity
         + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
         % (os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.mesh"), os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.sol"), NAME + "_la_masque.elas", NAME + ".elasticity.sol", 2000, 0.00000001)
     )
     shutil.copyfile(os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.mesh"), NAME + ".elasticity.mesh")
-    
+
     #Adjust the final reconstruction
     mesh = lib_msh.Mesh(NAME + ".elasticity.mesh")
     mesh.readSol()
@@ -163,4 +232,3 @@ if __name__ == "__main__":
     mesh.tris = mesh.tris[mesh.tris[:,-1]==2]
     mesh.discardUnused()
     mesh.write(NAME + ".final.mesh")
-    
