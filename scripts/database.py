@@ -551,7 +551,7 @@ if __name__ == "__main__":
     """
 
     # 13 - Morph the appropriate templates to the skull
-
+    """
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
@@ -579,11 +579,11 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES, 10)
-
+    lib_exe.parallel(morph, FILES)
+    """
 
     # 14 - Generate "La Masqué"
-    """
+
     def mask(group):
         INTERIOR  = [ os.path.join(directories[dossier], g) for g in group if "Skull" in g][0]
         EXTERIOR  = [ os.path.join(directories[dossier], g) for g in group if "Skin" in g][0]
@@ -604,4 +604,3 @@ if __name__ == "__main__":
     #GROUPS = [g for g in GROUPS if g not in os.listdir(directories[dossier])]
     print(GROUPS)
     lib_exe.parallel(mask, GROUPS, 1) #ne fonctionne pas sur plus d'un processeur à la fois ... ?
-    """

@@ -122,9 +122,11 @@ if __name__ == "__main__":
     def cov(d):
         return np.array([[scalar(x,y) for x in d] for y in d])
 
+    # Chargement des meshs des cranes morphés de la base de données
+    # en position 0 le mesh du crâne inconnu (attention si pas un crâne de la base il faut faire les étapes précédente et sélectionné le morphé)
     DATA = []
-    mesh = lib_msh.Mesh(args.input)
-    DATA.append(mesh.verts[:,:3])
+    meshIpt = lib_msh.Mesh(args.input)
+    DATA.append(meshIpt.verts[:,:3])
     FILES = [f for f in os.listdir(args.morphed)]
     print(FILES)
     for f in FILES:
@@ -132,10 +134,49 @@ if __name__ == "__main__":
             mesh = lib_msh.Mesh(os.path.join(args.morphed, f))
             DATA.append(mesh.verts[:,:3])
     DATA = np.array(DATA)
-
+    # Matrice de variance-covariance : calcul des produits scalaires qui me permet de déterminer le plus proche (valeur la plus élevée)
     A = cov(DATA)
     print("/n Matrice A VarCoVar /n",A)
 
+    B= []
+    for i in range(len(A[0])):
+        if A[i,0] < 0.99999999 and A[i,0] not in B:
+            B.append(A[i,0])
+    max = np.amax(B)
+    res = np.where(A == max)
+    print("/n Valeur max de B /n", max)
+    print("/n Localisation de la valeur max de A /n", res)
+    liste = list(zip(res[0], res[1]))
+    case = FILES[liste[0][1]].split("-")[0]
+    num = liste[0][1]
+    print(case)
+    print(num)
+    alpha = scalar(DATA[0],DATA[num]) # ou valeur "max" de B ... #LOL
+    print(alpha)
+
+    diff = DATA[0]- DATA[num]
+
+    meshDiff = lib_msh.Mesh()
+    meshDiff.verts   = np.array([[x[0],x[1],x[2],0] for x in diff])
+    meshDiff.tris    = meshIpt.tris
+    meshDiff.write(args.input.replace("Skull-morphed.mesh", "Tmp.mesh"))
+
+    TRAINING = os.listdir(args.morphed)
+    IN = os.path.join(args.morphed, ipt.replace("Skull-morphed.mesh", "Tmp.mesh"))
+    OUT = os.path.join(args.morphed, ipt.replace("Skull-morphed.mesh", "test.mesh"))
+    print(TRAINING)
+    print(IN)
+    print(OUT)
+
+
+
+    lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
+
+
+    sys.exit()
+
+
+    """
     B= []
     for i in range(len(A[0])):
         if A[i,0] < 0.99999999 and A[i,0] not in B:
@@ -183,8 +224,10 @@ if __name__ == "__main__":
 
     alpha = np.array([scalar(DATA[0],y) for y in DATA[num]])
     print(alpha)
+    """
 
-    sys.exit()
+
+
 
 
 
