@@ -16,8 +16,8 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = False
-PCAMASS = True
+REALMASS = True
+PCAMASS = False
 SKULLONLY = False
 
 #arguments
@@ -37,7 +37,7 @@ def create_templates_and_directories(args):
     Looks in the directory associated with the templates, for a skull.mesh file for instance.
     If skull.mesh is found, then a variable templates["skull"] becomes available.
     """
-    templateNames = ["test2", "ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skullOnly", "morphing_skullRM", "morphing_skullPCA", "box"]
+    templateNames = ["ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skullOnly", "morphing_skullRM", "morphing_skullPCA", "box"]
     templates     = {}
     for d in templateNames:
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
@@ -546,12 +546,12 @@ if __name__ == "__main__":
         IN  = os.path.join(directories[dossier], f)
         OUT = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
         lib_exe.execute( lib_exe.python_cmd("fill.py") + "-i %s -o %s -c 0.5 0.5 0.5 -r 0.05" % (IN, OUT))
-    FILES = [f for f in os.listdir(directories[dossier]) if "test2" in f]
+    FILES = [f for f in os.listdir(directories[dossier]) if "test2" in f] # le template 'test2' n'existe pas ...
     lib_exe.parallel(fill, FILES)
     """
 
     # 13 - Morph the appropriate templates to the skull
-    """
+
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
@@ -579,8 +579,8 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES)
-    """
+    lib_exe.parallel(morph, FILES, 6)
+
 
     # 14 - Generate "La Masqué"
 
@@ -597,9 +597,9 @@ if __name__ == "__main__":
         lib_exe.execute( lib_exe.python_cmd("mask.py") + "-i %s -e %s -o %s -t %s" % (INTERIOR, EXTERIOR, MASK, TEMPLATE))
 
     cases = set([f.split("-")[0] for f in os.listdir(directories[dossier]) if ".mesh" in f])
-    print (cases)
-    GROUPS = [ [f for f in os.listdir(directories[dossier]) if ("Skull-morphed.mesh" in f or "Skin-morphed.mesh" in f) and case in f and f.replace("-morphed.mesh", "_la_masque.mesh") not in os.listdir(directories[dossier]) ] for case in cases]
-    print(GROUPS)
+    #print (cases)
+    GROUPS = [ [f for f in os.listdir(directories[dossier]) if ("Skull-morphed.mesh" in f or "Skin-morphed.mesh" in f) and case in f and case+"-la_masque.mesh" not in os.listdir(directories[dossier])] for case in cases]
+    #print(GROUPS)
     GROUPS = [g for g in GROUPS if len(g)==2]
     #GROUPS = [g for g in GROUPS if g not in os.listdir(directories[dossier])]
     print(GROUPS)

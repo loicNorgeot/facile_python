@@ -40,9 +40,9 @@ if __name__=="__main__":
         sys.exit()
 
     mesh = lib_msh.Mesh(args.input)
-    #ico  = lib_msh.Mesh(ico=[args.center,args.radius])
-    #ico.tris[:,-1]=10
-    #mesh.fondre(ico)
+    ico  = lib_msh.Mesh(ico=[args.center,args.radius])
+    ico.tris[:,-1]=10
+    mesh.fondre(ico)
     mesh.write("out.mesh")
     lib_exe.execute(lib_exe.tetgen + "-pgANEYF out.mesh")
     lib_exe.execute(lib_exe.mmg3d + "out.1.mesh -nosurf -o " + args.output)
@@ -54,7 +54,7 @@ if __name__=="__main__":
     final = lib_msh.Mesh(args.output)
     for i,t in enumerate(final.tris):
         vert1 = final.verts[t[0]]
-        if distance(vert1, [0.5, 0.5, 0.5]) < 0.06:
+        if distance(vert1, [args.center[0], args.center[1], args.center[2]]) < 0.06:
             final.tris[i,-1] = 10
     final.write(args.output)
 
