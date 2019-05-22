@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = False
+REALMASS = True
 PCAMASS = False
-SKULLONLY = True
+SKULLONLY = False
 
 #arguments
 def get_arguments():
@@ -53,7 +53,8 @@ def create_templates_and_directories(args):
         "masseter",
         "PcaMass",
         "RealMass",
-        "SkullOnly"
+        "SkullOnly",
+        "reconstructed"
     ]
     directories    = {}
     for d in dirNames:

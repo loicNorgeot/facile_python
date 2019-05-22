@@ -57,11 +57,13 @@ def init():
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
 
     #Create the directories to process files into
-    dirNames = ["PcaMass","RealMass","SkullOnly"]
+    dirNames = ["PcaMass","RealMass","SkullOnly", "reconstructed"]
     directories    = {}
     for d in dirNames:
         #print(d)
         directories[d] = os.path.abspath(os.path.join(args.data, d))
+        if not os.path.exists(directories[d]):
+            os.makedirs(directories[d])
 
     return args, templates, directories
 
@@ -276,29 +278,40 @@ if __name__ == "__main__":
 
 
     #JUSTE CAR JE N4AI PAS TOUS LES MASQUES J4EN CHOISI UN AUTRE ASSEZ "PROCHE"
-    #case = "ADASA"
+    #case = "BELNA"
 
-    #Create the elasticity file
-    with open(os.path.join(directories[dossier], NAME + "-la_masque.elas"), "w") as f:
+    maskCase = lib_msh.Mesh(os.path.join(directories[dossier], case + "-la_masque.mesh"))
+    print("We're here")
+    unknownMorphed = lib_msh.Mesh(os.path.join(directories[dossier], NAME + "-Skull-morphed.mesh"))
+    unknownMorphed.tets = np.array([])
+    unknownMorphed.discardUnused()
+    n = len(maskCase.verts)
+    maskCase.vectors = np.zeros((n,3))
+    maskCase.vectors[:len(unknownMorphed.verts)] = unknownMorphed.verts[:,:3] - maskCase.verts[:len(unknownMorphed.verts),:3]
+    maskCase.writeSol( os.path.join(directories[dossier], case + "to" + NAME + "-la_masque.sol") )
+    #mesh.write( args.output )
+
+    #Create the elasticity file : attention seulement une fois
+    with open(os.path.join(directories["reconstructed"], "parameters.elas"), "w") as f:
         f.write("Dirichlet\n1\n1 vertex f\n\n")
         f.write("Lame\n1\n2 186000. 3400.\n\n")
 
     # 11 - Run the elasticity with the given input = last step
     IN = os.path.join(directories[dossier], case + "-la_masque.mesh")
-    SOL = os.path.join(directories[dossier], case + "-la_masque.sol")
-    OUT = os.path.join(directories[dossier], NAME + "-elasticity.sol")
-    PARAMETERS = os.path.join(directories[dossier],NAME + "-la_masque.elas")
+    SOL = os.path.join(directories[dossier], case + "to" + NAME + "-la_masque.sol")
+    OUT = os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-elasticity.sol")
+    PARAMETERS = os.path.join(directories["reconstructed"],"parameters.elas")
     lib_exe.execute( lib_exe.elasticity
         + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
         % (IN, SOL, PARAMETERS, OUT, 1000, 0.00000001)
     )
-    shutil.copyfile(os.path.join(directories[dossier], case + "-la_masque.mesh"), os.path.join(directories[dossier], NAME + "-elasticity.mesh"))
+    shutil.copyfile(os.path.join(directories[dossier], case + "-la_masque.mesh"), os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-elasticity.mesh"))
 
     #Adjust the final reconstruction
-    meshF = lib_msh.Mesh(os.path.join(directories[dossier], NAME + "-elasticity.mesh"))
+    meshF = lib_msh.Mesh(os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-elasticity.mesh"))
     meshF.readSol()
-    meshF.verts[:,:3] = meshF.verts[:,:3] + 0.1*meshF.vectors
+    meshF.verts[:,:3] += meshF.vectors
     meshF.tets = np.array([])
     meshF.tris = meshF.tris[meshF.tris[:,-1]==2]
     meshF.discardUnused()
-    meshF.write(os.path.join(directories[dossier], NAME + "-recons.mesh"))
+    meshF.write(os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-recons.mesh"))
