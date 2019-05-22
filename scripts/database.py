@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = True
+REALMASS = False
 PCAMASS = False
-SKULLONLY = False
+SKULLONLY = True
 
 #arguments
 def get_arguments():
@@ -450,7 +450,7 @@ if __name__ == "__main__":
         lib_exe.execute( lib_exe.python_cmd("transform.py") + "-i %s -o %s -m %s" % (SOURCE, OUT, MAT))
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull.mesh" in f and f.replace(".mesh", "-aligned.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin.mesh" in f and f.replace(".mesh", "-aligned.mesh") not in os.listdir(directories[dossier])]
-    lib_exe.parallel(alignSkull, FILES)
+    lib_exe.parallel(alignSkull, FILES, 3)
     lib_exe.parallel(alignSkin, SKIN)
 
 
@@ -466,7 +466,7 @@ if __name__ == "__main__":
     """
 
     # 10 - Warp the bones
-    """
+
     def warp(f):
         with tempfile.TemporaryDirectory(dir = os.path.join(directories[dossier])) as tmp:
             os.chdir(tmp)
@@ -476,8 +476,8 @@ if __name__ == "__main__":
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
     FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
-    lib_exe.parallel(warp, FILES)
-    """
+    lib_exe.parallel(warp, FILES, 3)
+
     # def warp(files):
     #     for f in files:
     #         IN  = os.path.join(directories[dossier], f)
@@ -515,8 +515,8 @@ if __name__ == "__main__":
     SKULL = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.replace("-warped.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin" in f and f.replace("-aligned.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
 
-    lib_exe.parallel(signedSkull, SKULL,3)
-    lib_exe.parallel(signedSkin, SKIN, 3)
+    lib_exe.parallel(signedSkull, SKULL,2)
+    lib_exe.parallel(signedSkin, SKIN,2)
 
     # if len(SKULL)>0:
     #     print('\033[95m' + "## EXECUTING 'signedSkull' on " + str(len(SKULL)) + " cases " + '\033[0m')
@@ -551,7 +551,7 @@ if __name__ == "__main__":
     """
 
     # 13 - Morph the appropriate templates to the skull
-
+    """
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
@@ -579,8 +579,8 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES, 6)
-
+    lib_exe.parallel(morph, FILES, 2)
+    """
 
     # 14 - Generate "La Masqué"
 
@@ -603,4 +603,4 @@ if __name__ == "__main__":
     GROUPS = [g for g in GROUPS if len(g)==2]
     #GROUPS = [g for g in GROUPS if g not in os.listdir(directories[dossier])]
     print(GROUPS)
-    lib_exe.parallel(mask, GROUPS, 1) #ne fonctionne pas sur plus d'un processeur à la fois ... ?
+    lib_exe.parallel(mask, GROUPS, 1) #ne fonctionne pas sur plus d'un processeur à la fois car il faudrait faire des dossier temporaire si non tout s'écrit par dessus le voisin ...

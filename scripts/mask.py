@@ -35,7 +35,7 @@ if __name__ == "__main__":
     if args.template:
         args.template = os.path.abspath(args.template)
 
-    
+
     #check for intersections
     if intersects(args.interior):
         print("interior surface is self-intersecting")
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
 
     #Add a .sol corresponding to the difference between the interior surface and the template
-    """
+
     mesh = lib_msh.Mesh(args.output)
 
     if args.template:
@@ -120,4 +120,3 @@ if __name__ == "__main__":
 
         mesh.writeSol( args.output.replace(".mesh", ".sol") )
         mesh.write( args.output )
-    """

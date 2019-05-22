@@ -37,33 +37,43 @@ def init():
     #Argument parsing
     parser = argparse.ArgumentParser(description="Reconstruction of one skull")
     parser.add_argument("-t", "--templates", type=str, help="directory for the templates", required=True)
-    parser.add_argument("-m", "--morphed", type=str, help="directory where the morphed results have been created", required=True)
+    parser.add_argument("-d", "--data", type=str, help="directory where the morphed and la_masque results have been created", required=True)
     #parser.add_argument("-i", "--input",     type=str, help=".mesh file(s) to be reconstructed", nargs="+", required=True)
     parser.add_argument("-i", "--input",     type=str, help=".mesh file(s) to be reconstructed", required=True)
     args = parser.parse_args()
     args.templates = os.path.abspath(args.templates)
-    args.morphed = os.path.abspath(args.morphed)
+    args.data = os.path.abspath(args.data)
     args.input = os.path.abspath(args.input)
 
 
     #args.input = [os.path.abspath(n) for n in args.input]
-    #print(args.input)
+    #print(args.data)
+
 
     #Template files
-    templateNames = ["masseter", "mandible", "skull", "sphere", "morphing_face", "morphing_skull", "box"]
+    templateNames = ["ellipsoide", "morphing_mass", "skull", "sphere", "morphing_face", "morphing_skullOnly", "morphing_skullRM", "morphing_skullPCA", "box"]
     templates     = {}
     for d in templateNames:
         templates[d] = os.path.abspath(os.path.join(args.templates, d + ".mesh"))
 
-    return args, templates
+    #Create the directories to process files into
+    dirNames = ["PcaMass","RealMass","SkullOnly"]
+    directories    = {}
+    for d in dirNames:
+        #print(d)
+        directories[d] = os.path.abspath(os.path.join(args.data, d))
+
+    return args, templates, directories
 
 if __name__ == "__main__":
 
     #Get the templates and arguments
-    args, templates = init()
-    NAME = "reconstruction"
+    args, templates, directories = init()
+
     ipt = args.input.split("/")[-1]
-    print(ipt)
+    #print(ipt)
+    NAME = ipt.split("-")[0]
+    #print(NAME)
 
     """
     # 1 - If needed, convert the .obj or .stl objects to .mesh
@@ -122,16 +132,27 @@ if __name__ == "__main__":
     def cov(d):
         return np.array([[scalar(x,y) for x in d] for y in d])
 
+    REALMASS = False
+    PCAMASS = False
+    SKULLONLY = True
+
+    if SKULLONLY == True:
+        dossier = "SkullOnly"
+    if REALMASS == True:
+        dossier = "RealMass"
+    if PCAMASS == True:
+        dossier = "PcaMass"
+
     # Chargement des meshs des cranes morphés de la base de données
     # en position 0 le mesh du crâne inconnu (attention si pas un crâne de la base il faut faire les étapes précédente et sélectionné le morphé)
     DATA = []
     meshIpt = lib_msh.Mesh(args.input)
     DATA.append(meshIpt.verts[:,:3])
-    FILES = [f for f in os.listdir(args.morphed)]
+    FILES = [f for f in os.listdir(directories[dossier]) if "Skull-morphed.mesh" in f]
     print(FILES)
     for f in FILES:
         if f!= ipt:
-            mesh = lib_msh.Mesh(os.path.join(args.morphed, f))
+            mesh = lib_msh.Mesh(os.path.join(directories[dossier], f))
             DATA.append(mesh.verts[:,:3])
     DATA = np.array(DATA)
     # Matrice de variance-covariance : calcul des produits scalaires qui me permet de déterminer le plus proche (valeur la plus élevée)
@@ -151,6 +172,7 @@ if __name__ == "__main__":
     num = liste[0][1]
     print(case)
     print(num)
+    """
     alpha = scalar(DATA[0],DATA[num]) # ou valeur "max" de B ... #LOL
     print(alpha)
 
@@ -174,6 +196,7 @@ if __name__ == "__main__":
 
 
     sys.exit()
+    """
 
 
     """
@@ -256,22 +279,26 @@ if __name__ == "__main__":
     #case = "ADASA"
 
     #Create the elasticity file
-    with open(NAME + "_la_masque.elas", "w") as f:
+    with open(os.path.join(directories[dossier], NAME + "-la_masque.elas"), "w") as f:
         f.write("Dirichlet\n1\n1 vertex f\n\n")
         f.write("Lame\n1\n2 186000. 3400.\n\n")
 
     # 11 - Run the elasticity with the given input = last step
+    IN = os.path.join(directories[dossier], case + "-la_masque.mesh")
+    SOL = os.path.join(directories[dossier], case + "-la_masque.sol")
+    OUT = os.path.join(directories[dossier], NAME + "-elasticity.sol")
+    PARAMETERS = os.path.join(directories[dossier],NAME + "-la_masque.elas")
     lib_exe.execute( lib_exe.elasticity
         + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
-        % (os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.mesh"), os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.sol"), NAME + "_la_masque.elas", NAME + ".elasticity.sol", 2000, 0.00000001)
+        % (IN, SOL, PARAMETERS, OUT, 1000, 0.00000001)
     )
-    shutil.copyfile(os.path.join("/home/lydieuro/Bureau/FaciLe-DataRecons/DATA-base/masked", case + "_la_masque.mesh"), NAME + ".elasticity.mesh")
+    shutil.copyfile(os.path.join(directories[dossier], case + "-la_masque.mesh"), os.path.join(directories[dossier], NAME + "-elasticity.mesh"))
 
     #Adjust the final reconstruction
-    mesh = lib_msh.Mesh(NAME + ".elasticity.mesh")
-    mesh.readSol()
-    mesh.verts[:,:3] += mesh.vectors
-    mesh.tets = np.array([])
-    mesh.tris = mesh.tris[mesh.tris[:,-1]==2]
-    mesh.discardUnused()
-    mesh.write(NAME + ".final.mesh")
+    meshF = lib_msh.Mesh(os.path.join(directories[dossier], NAME + "-elasticity.mesh"))
+    meshF.readSol()
+    meshF.verts[:,:3] = meshF.verts[:,:3] + 0.1*meshF.vectors
+    meshF.tets = np.array([])
+    meshF.tris = meshF.tris[meshF.tris[:,-1]==2]
+    meshF.discardUnused()
+    meshF.write(os.path.join(directories[dossier], NAME + "-recons.mesh"))
