@@ -75,7 +75,7 @@ if __name__ == "__main__":
     ipt = args.input.split("/")[-1]
     #print(ipt)
     NAME = ipt.split("-")[0]
-    #print(NAME)
+    print(NAME)
 
     """
     # 1 - If needed, convert the .obj or .stl objects to .mesh
@@ -151,29 +151,48 @@ if __name__ == "__main__":
     meshIpt = lib_msh.Mesh(args.input)
     DATA.append(meshIpt.verts[:,:3])
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-morphed.mesh" in f]
-    print(FILES)
+    #print(FILES)
+    nameFILES = []
     for f in FILES:
         if f!= ipt:
             mesh = lib_msh.Mesh(os.path.join(directories[dossier], f))
             DATA.append(mesh.verts[:,:3])
+            nameFILES.append(f.split("-")[0])
     DATA = np.array(DATA)
-    # Matrice de variance-covariance : calcul des produits scalaires qui me permet de déterminer le plus proche (valeur la plus élevée)
+    # Matrice de variance-covariance : calcul des produits scalaires qui me permet de déterminer les 3 plus proches (valeur la plus élevée)
     A = cov(DATA)
-    print("/n Matrice A VarCoVar /n",A)
-
+    #print("/n Matrice A VarCoVar /n",A)
     B= []
     for i in range(len(A[0])):
-        if A[i,0] < 0.99999999 and A[i,0] not in B:
+        if A[i,0] < 0.9999 and A[i,0] not in B:
             B.append(A[i,0])
-    max = np.amax(B)
+    #max = np.amax(B)
+    Bbis = sorted(B, reverse=True)
+    res = []
+    liste = []
+    cases = []
+    num = []
+    N = 3
+    for i in range(N):
+        res.append(np.where(A == Bbis[i]))
+        liste.append(list(zip(res[i][0], res[i][1])))
+        num.append(liste[i][0][1]-1)
+        cases.append(nameFILES[num[i]])
+    #print(cases)
+
+
+    """
     res = np.where(A == max)
     print("/n Valeur max de B /n", max)
     print("/n Localisation de la valeur max de A /n", res)
     liste = list(zip(res[0], res[1]))
     case = FILES[liste[0][1]].split("-")[0]
     num = liste[0][1]
+    print(liste)
     print(case)
     print(num)
+    """
+
     """
     alpha = scalar(DATA[0],DATA[num]) # ou valeur "max" de B ... #LOL
     print(alpha)
@@ -280,38 +299,64 @@ if __name__ == "__main__":
     #JUSTE CAR JE N4AI PAS TOUS LES MASQUES J4EN CHOISI UN AUTRE ASSEZ "PROCHE"
     #case = "BELNA"
 
-    maskCase = lib_msh.Mesh(os.path.join(directories[dossier], case + "-la_masque.mesh"))
-    print("We're here")
-    unknownMorphed = lib_msh.Mesh(os.path.join(directories[dossier], NAME + "-Skull-morphed.mesh"))
-    unknownMorphed.tets = np.array([])
-    unknownMorphed.discardUnused()
-    n = len(maskCase.verts)
-    maskCase.vectors = np.zeros((n,3))
-    maskCase.vectors[:len(unknownMorphed.verts)] = unknownMorphed.verts[:,:3] - maskCase.verts[:len(unknownMorphed.verts),:3]
-    maskCase.writeSol( os.path.join(directories[dossier], case + "to" + NAME + "-la_masque.sol") )
-    #mesh.write( args.output )
-
     #Create the elasticity file : attention seulement une fois
+    """
     with open(os.path.join(directories["reconstructed"], "parameters.elas"), "w") as f:
         f.write("Dirichlet\n1\n1 vertex f\n\n")
         f.write("Lame\n1\n2 186000. 3400.\n\n")
+    """
+    
+    #Réalisation de 3 reconstructions à partir des masque sélectionné ci dessus comme les plus proches
+    count = 0
+    for case in cases:
+    # Création des .sol sur les 3 masques sélectionnés comme les plus proches dans la bases de données
+        maskCase = lib_msh.Mesh(os.path.join(directories[dossier], case + "-la_masque.mesh"))
+        unknownMorphed = lib_msh.Mesh(os.path.join(directories[dossier], NAME + "-Skull-morphed.mesh"))
+        unknownMorphed.tets = np.array([])
+        unknownMorphed.discardUnused()
+        n = len(maskCase.verts)
+        maskCase.vectors = np.zeros((n,3))
+        maskCase.vectors[:len(unknownMorphed.verts)] = unknownMorphed.verts[:,:3] - maskCase.verts[:len(unknownMorphed.verts),:3]
+        maskCase.writeSol( os.path.join(directories[dossier], case + "to" + NAME + "-la_masque.sol") )
+        #mesh.write( args.output )
 
-    # 11 - Run the elasticity with the given input = last step
-    IN = os.path.join(directories[dossier], case + "-la_masque.mesh")
-    SOL = os.path.join(directories[dossier], case + "to" + NAME + "-la_masque.sol")
-    OUT = os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-elasticity.sol")
-    PARAMETERS = os.path.join(directories["reconstructed"],"parameters.elas")
-    lib_exe.execute( lib_exe.elasticity
-        + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
-        % (IN, SOL, PARAMETERS, OUT, 1000, 0.00000001)
-    )
-    shutil.copyfile(os.path.join(directories[dossier], case + "-la_masque.mesh"), os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-elasticity.mesh"))
+    # Run the elasticity with the given input = last step
+        IN = os.path.join(directories[dossier], case + "-la_masque.mesh")
+        SOL = os.path.join(directories[dossier], case + "to" + NAME + "-la_masque.sol")
+        OUT = os.path.join(directories["reconstructed"], NAME  + "-" + str(count) + "-" + dossier + "-elasticity.sol")
+        PARAMETERS = os.path.join(directories["reconstructed"],"parameters.elas")
+        lib_exe.execute( lib_exe.elasticity
+            + "%s -s %s -p %s -o %s -n %d +v -r %.20f"
+            % (IN, SOL, PARAMETERS, OUT, 1000, 0.00000001)
+        )
 
-    #Adjust the final reconstruction
-    meshF = lib_msh.Mesh(os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-elasticity.mesh"))
-    meshF.readSol()
-    meshF.verts[:,:3] += meshF.vectors
-    meshF.tets = np.array([])
-    meshF.tris = meshF.tris[meshF.tris[:,-1]==2]
-    meshF.discardUnused()
-    meshF.write(os.path.join(directories["reconstructed"], NAME + "-" + dossier + "-recons.mesh"))
+        shutil.copyfile(os.path.join(directories[dossier], case + "-la_masque.mesh"), os.path.join(directories["reconstructed"], NAME + "-" + str(count) + "-" + dossier + "-elasticity.mesh"))
+
+    # Adjust the final reconstruction
+        mesh = lib_msh.Mesh(os.path.join(directories["reconstructed"], NAME + "-" + str(count) + "-" + dossier + "-elasticity.mesh"))
+        mesh.readSol()
+        mesh.verts[:,:3] += mesh.vectors
+        mesh.tets = np.array([])
+        mesh.tris = mesh.tris[mesh.tris[:,-1]==2]
+        mesh.discardUnused()
+        mesh.write(os.path.join(directories["reconstructed"], NAME + "-" + str(count) + "-" + dossier + "-recons.mesh"))
+
+        os.remove(os.path.join(directories["reconstructed"], NAME + "-" + str(count) + "-" + dossier + "-elasticity.mesh"))
+        os.remove(os.path.join(directories["reconstructed"], NAME + "-" + str(count) + "-" + dossier + "-elasticity.sol"))
+
+        count += 1
+
+
+
+    # Moyenne des reconstrcutions pour une version finale
+    mesh = lib_msh.Mesh(os.path.join(directories["reconstructed"], NAME  + "-" + str(0) + "-" + dossier + "-recons.mesh"))
+    RECONS = [f for f in os.listdir(directories["reconstructed"]) if NAME in f and "-recons.mesh" in f]
+    #print(RECONS)
+    mesh1 = lib_msh.Mesh(os.path.join(directories["reconstructed"], RECONS[0]))
+    mesh2 = lib_msh.Mesh(os.path.join(directories["reconstructed"], RECONS[1]))
+    mesh3 = lib_msh.Mesh(os.path.join(directories["reconstructed"], RECONS[2]))
+    mesh.verts = (mesh1.verts + mesh2.verts + mesh3.verts)/3
+    mesh.discardUnused()
+    mesh.write(os.path.join(directories["reconstructed"], NAME + "-" + dossier + ".mesh"))
+
+    # Suppression des maillages intermédiare

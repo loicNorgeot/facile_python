@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = True
+REALMASS = False
 PCAMASS = False
-SKULLONLY = False
+SKULLONLY = True
 
 #arguments
 def get_arguments():
