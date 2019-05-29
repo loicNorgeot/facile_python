@@ -38,12 +38,36 @@ if __name__ == "__main__":
     #cmd = lib_exe.morphing + " %s %s -nit %d -dref 1 %d -elref 1 %d -bref 1 %d  > /dev/null 2>&1" % (args.signed, "template.mesh", args.iterations, args.icotris, args.icotets, args.fixtris)
     lib_exe.execute(cmd)
 
+
+    chemin = args.template
     finalM = None
+    try:
+        print("try")
+        number_max=args.iterations
+        for f in [x for x in os.listdir(args.localisation) if "signed" in x and ".mesh" in x and x!="signed.mesh"]:
+            print(f)
+            number = int(f.split(".")[1])
+            if number==number_max:
+                finalM = f
+                #final = chemin.replace("sphere.mesh", f)
+        if finalM!=None:
+            while intersects(finalM):
+                number_max=number_max-50
+                for f in [x for x in os.listdir(args.localisation) if "signed" in x and ".mesh" in x and x!="signed.mesh"]:
+                    number = int(f.split(".")[1])
+                    if number==number_max:
+                        finalM = f
+                        #final = chemin.replace("sphere.mesh", f)
+    except:
+        finalM = "signed." + str(args.iterations) + ".mesh"
+
+
+    #finalM = None
     finalS = None
     #Clean the mesh
     name = "signed.mesh"
-    for item in [x for x in os.listdir(args.localisation) if ".1.mesh" in x]:
-        finalM = item
+    #for item in [x for x in os.listdir(args.localisation) if ".1.mesh" in x]:
+    #    finalM = item
     for item in [x for x in os.listdir(args.localisation) if ".1.depl.sol" in x]:
         finalS = item
 

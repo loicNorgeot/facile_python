@@ -16,9 +16,9 @@ import tempfile
 
 from lib_paths import *
 
-REALMASS = False
+REALMASS = True
 PCAMASS = False
-SKULLONLY = True
+SKULLONLY = False
 
 #arguments
 def get_arguments():
@@ -477,6 +477,7 @@ if __name__ == "__main__":
             lib_exe.execute( lib_exe.python_cmd("warp.py") + "-i %s -o %s -t %s" % (IN, OUT, TEMPLATE))
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-aligned.mesh" in f]
     FILES = [f for f in FILES if f.replace("-aligned.mesh", "-warped.mesh") not in os.listdir(directories[dossier])]
+    print(FILES)
     lib_exe.parallel(warp, FILES, 3)
 
     # def warp(files):
@@ -516,8 +517,8 @@ if __name__ == "__main__":
     SKULL = [f for f in os.listdir(directories[dossier]) if "Skull" in f and f.replace("-warped.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
     SKIN = [f for f in os.listdir(directories[dossier]) if "Skin" in f and f.replace("-aligned.mesh", "-signed.mesh") not in os.listdir(directories[dossier])]
 
-    lib_exe.parallel(signedSkull, SKULL,2)
-    lib_exe.parallel(signedSkin, SKIN,2)
+    lib_exe.parallel(signedSkull, SKULL,3)
+    lib_exe.parallel(signedSkin, SKIN,3)
 
     # if len(SKULL)>0:
     #     print('\033[95m' + "## EXECUTING 'signedSkull' on " + str(len(SKULL)) + " cases " + '\033[0m')
@@ -552,11 +553,11 @@ if __name__ == "__main__":
     """
 
     # 13 - Morph the appropriate templates to the skull
-    """
+
     def morph(f):
         IN   = os.path.join(directories[dossier], f)
         OUT  = os.path.join(directories[dossier], f.replace("-signed.mesh", "-morphed.mesh"))
-        NIT = 2000
+        NIT = 1500
         if SKULLONLY == True:
             if "Skull" in f:
                 TMP  = templates["morphing_skullOnly"]
@@ -580,8 +581,8 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if ("Skull" in f or "Skin" in f) and f.endswith("-signed.mesh") ]
     FILES = [f for f in FILES if f.replace("-signed.mesh", "-morphed.mesh") not in os.listdir(directories[dossier])]
     print(FILES)
-    lib_exe.parallel(morph, FILES, 2)
-    """
+    lib_exe.parallel(morph, FILES, 7)
+
 
     # 14 - Generate "La Masqué"
 

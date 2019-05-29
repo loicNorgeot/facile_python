@@ -50,7 +50,11 @@ if __name__ == "__main__":
     #exterior.tris = exterior.tris[exterior.tris[:,-1]!=2]
     exterior.tris[:,-1] = 2
     exterior.discardUnused()
+    # interior.tets = np.array([])
+    # interior.tris = interior.tris[interior.tris[:,-1] != 10]
     interior.tris[:,-1] = 1
+    # interior.discardUnused()
+    # interior.write("HASSA-Skull-morphed.mesh")
     interior.fondre(exterior)
     interior.write("mask.mesh")
 

@@ -135,8 +135,8 @@ if __name__ == "__main__":
         return np.array([[scalar(x,y) for x in d] for y in d])
 
     REALMASS = False
-    PCAMASS = False
-    SKULLONLY = True
+    PCAMASS = True
+    SKULLONLY = False
 
     if SKULLONLY == True:
         dossier = "SkullOnly"
@@ -153,11 +153,15 @@ if __name__ == "__main__":
     FILES = [f for f in os.listdir(directories[dossier]) if "Skull-morphed.mesh" in f]
     #print(FILES)
     nameFILES = []
+    # count = 1
     for f in FILES:
         if f!= ipt:
             mesh = lib_msh.Mesh(os.path.join(directories[dossier], f))
+            # print(f, count)
+            # print(mesh.verts.shape)
             DATA.append(mesh.verts[:,:3])
             nameFILES.append(f.split("-")[0])
+            # count += 1
     DATA = np.array(DATA)
     # Matrice de variance-covariance : calcul des produits scalaires qui me permet de déterminer les 3 plus proches (valeur la plus élevée)
     A = cov(DATA)
@@ -181,121 +185,6 @@ if __name__ == "__main__":
     #print(cases)
 
 
-    """
-    res = np.where(A == max)
-    print("/n Valeur max de B /n", max)
-    print("/n Localisation de la valeur max de A /n", res)
-    liste = list(zip(res[0], res[1]))
-    case = FILES[liste[0][1]].split("-")[0]
-    num = liste[0][1]
-    print(liste)
-    print(case)
-    print(num)
-    """
-
-    """
-    alpha = scalar(DATA[0],DATA[num]) # ou valeur "max" de B ... #LOL
-    print(alpha)
-
-    diff = DATA[0]- DATA[num]
-
-    meshDiff = lib_msh.Mesh()
-    meshDiff.verts   = np.array([[x[0],x[1],x[2],0] for x in diff])
-    meshDiff.tris    = meshIpt.tris
-    meshDiff.write(args.input.replace("Skull-morphed.mesh", "Tmp.mesh"))
-
-    TRAINING = os.listdir(args.morphed)
-    IN = os.path.join(args.morphed, ipt.replace("Skull-morphed.mesh", "Tmp.mesh"))
-    OUT = os.path.join(args.morphed, ipt.replace("Skull-morphed.mesh", "test.mesh"))
-    print(TRAINING)
-    print(IN)
-    print(OUT)
-
-
-
-    lib_exe.execute( lib_exe.python_cmd("pca.py") + "-t %s -u %s -o %s" % (TRAINING, IN, OUT))
-
-
-    sys.exit()
-    """
-
-
-    """
-    B= []
-    for i in range(len(A[0])):
-        if A[i,0] < 0.99999999 and A[i,0] not in B:
-            B.append(A[i,0])
-    max = np.amax(B)
-    res = np.where(A == max)
-    print("/n Valeur max de B /n", max)
-    print("/n Localisation de la valeur max de A /n", res)
-    liste = list(zip(res[0], res[1]))
-    print(liste[0][1])
-    case = []
-    num = []
-    case.append(FILES[liste[0][1]].split("-")[0])
-    num.append(liste[0][1])
-    B= []
-    for i in range(len(A[0])):
-        if A[i,liste[0][1]] < 0.99999999 and A[i,liste[0][1]] not in B:
-            B.append(A[i,liste[0][1]])
-    min1 = np.amin(B)
-    res = np.where(A == min1)
-    print("/n Valeur min de B /n", min1)
-    print("/n Localisation de la valeur min de B/n", res)
-    liste1 = list(zip(res[0], res[1]))
-    print(liste1[0][1])
-    case.append(FILES[liste1[0][1]].split("-")[0])
-    num.append(liste1[0][1])
-    B= []
-    for i in range(len(A[0])):
-        if A[i,liste[0][1]] < 0.99999999 and A[i,liste1[0][1]] < 0.99999999:
-            B.append((A[i,liste[0][1]] + A[i,liste1[0][1]])/2)
-        else:
-            B.append(1.0)
-    min2 = np.amin(B)
-    res = np.where(B == min2)
-
-    print("/n Valeur min de B /n", min2)
-    print("/n Localisation de la valeur min de B/n", res)
-    liste2 = list(zip(res[0]))
-    print(liste2[0][0])
-    case.append(FILES[liste2[0][0]].split("-")[0])
-    num.append(liste2[0][0])
-    print(case)
-    print(num)
-
-
-    alpha = np.array([scalar(DATA[0],y) for y in DATA[num]])
-    print(alpha)
-    """
-
-
-
-
-
-
-    """
-    def distance(a,b):
-        return ( (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2 ) **0.5
-    mesh = lib_msh.Mesh(NAME + ".morphed.mesh")
-    MORPHED = [f for f in os.listdir(args.morphed) if "Skull.mesh" in f]
-    MORPHED.sort()
-    MEANS = []
-    for i,f in enumerate(MORPHED):
-        morphed = lib_msh.Mesh(os.path.join(args.morphed, f))
-        if len(morphed.verts)>=len(mesh.verts):
-            morphed.tris = morphed.tris[morphed.tris[:,-1]!=10]
-            morphed.tets = np.array([])
-            morphed.discardUnused()
-            mean = np.mean([distance(v1,v2) for v1,v2 in zip(morphed.verts, mesh.verts)])
-            print(i,mean, f)
-            MEANS.append([i, mean, f])
-    case = MORPHED[MEANS[np.argmin([mean[1] for mean in MEANS])][0]].split("-")[0]
-    print(case)
-    """
-
-
     #JUSTE CAR JE N4AI PAS TOUS LES MASQUES J4EN CHOISI UN AUTRE ASSEZ "PROCHE"
     #case = "BELNA"
 
@@ -305,7 +194,7 @@ if __name__ == "__main__":
         f.write("Dirichlet\n1\n1 vertex f\n\n")
         f.write("Lame\n1\n2 186000. 3400.\n\n")
     """
-    
+
     #Réalisation de 3 reconstructions à partir des masque sélectionné ci dessus comme les plus proches
     count = 0
     for case in cases:
