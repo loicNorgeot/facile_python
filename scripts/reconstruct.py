@@ -135,8 +135,8 @@ if __name__ == "__main__":
         return np.array([[scalar(x,y) for x in d] for y in d])
 
     REALMASS = False
-    PCAMASS = True
-    SKULLONLY = False
+    PCAMASS = False
+    SKULLONLY = True
 
     if SKULLONLY == True:
         dossier = "SkullOnly"
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     for case in cases:
     # Création des .sol sur les 3 masques sélectionnés comme les plus proches dans la bases de données
         maskCase = lib_msh.Mesh(os.path.join(directories[dossier], case + "-la_masque.mesh"))
-        unknownMorphed = lib_msh.Mesh(os.path.join(directories[dossier], NAME + "-Skull-morphed.mesh"))
+        unknownMorphed = lib_msh.Mesh(args.input)
         unknownMorphed.tets = np.array([])
         unknownMorphed.discardUnused()
         n = len(maskCase.verts)
